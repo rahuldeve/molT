@@ -374,18 +374,18 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         )
 
         tokens = np.pad(tokens, (0, n_mol_desc), constant_values=0)
-        pos_embeds = np.pad(pos_embeds, ((0, n_mol_desc), (0, 0)), constant_values=0.0)  # type: ignore
+        pos_embeds = np.pad(pos_embeds, ((0, n_mol_desc), (0, 0)), constant_values=0)  # type: ignore
         atom_props = np.pad(atom_props, ((0, 0), (0, n_mol_desc)), constant_values=0)  # type: ignore
         bond_props = np.pad(bond_props, ((0, 0), (0, n_mol_desc)), constant_values=0)  # type: ignore
 
         # convert to lists for easier processing later
         # flattening pos_embeds for compatiability with BatchEncoding and DataCollator
         # maybe do list conversion after special_tokens?
-        token_idxs = tokens.tolist()
-        input_ids = input_ids.tolist()
+        token_idxs = tokens.astype(int).tolist()
+        input_ids = input_ids.astype(int).tolist()
         pos_embeds_shape = list(pos_embeds.shape)
         pos_embeds = pos_embeds.flatten().tolist()
-        token_type_ids = token_type_ids.tolist()
+        token_type_ids = token_type_ids.astype(int).tolist()
         atom_props = atom_props.tolist()
         bond_props = bond_props.tolist()
         mol_desc = mol_desc.tolist()

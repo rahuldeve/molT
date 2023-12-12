@@ -52,22 +52,22 @@ class AtomPropModellingHead(nn.Module):
 
             atom_in_ring_loss = F.cross_entropy(
                 atom_in_ring.view(-1, self.num_in_ring_type),
-                prop_atom_in_ring.reshape(-1),
+                prop_atom_in_ring.reshape(-1).long(),
             )
 
             atom_hybridization_loss = F.cross_entropy(
                 atom_hybridization.view(-1, self.num_hybridization_type),
-                prop_atom_hybridization.reshape(-1),
+                prop_atom_hybridization.reshape(-1).long(),
             )
 
             atom_chirality_loss = F.cross_entropy(
                 atom_chirality.view(-1, self.num_chirality_type),
-                prop_atom_chirality.reshape(-1),
+                prop_atom_chirality.reshape(-1).long(),
             )
 
             atom_charge_loss = F.cross_entropy(
                 atom_charge.view(-1, self.num_charge_types),
-                prop_atom_charge.reshape(-1),
+                prop_atom_charge.reshape(-1).long(),
             )
 
             loss = (

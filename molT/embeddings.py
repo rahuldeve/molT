@@ -35,10 +35,10 @@ class AtomPropertyEmbedder(nn.Module):
         prop_atom_hybridization,
         prop_atom_chirality,
     ):
-        in_ring_embeds = self.in_ring_embedding(prop_atom_in_ring)
-        charge_embedding = self.charge_embedding(prop_atom_charge)
-        hybridization_embedding = self.hybridization_embedding(prop_atom_hybridization)
-        chirality_embedding = self.chirality_embedding(prop_atom_chirality)
+        in_ring_embeds = self.in_ring_embedding(prop_atom_in_ring.long())
+        charge_embedding = self.charge_embedding(prop_atom_charge.long())
+        hybridization_embedding = self.hybridization_embedding(prop_atom_hybridization.long())
+        chirality_embedding = self.chirality_embedding(prop_atom_chirality.long())
         prop_embedding = torch.cat(
             [
                 in_ring_embeds,
@@ -79,9 +79,9 @@ class BondPropertyEmbedder(nn.Module):
         prop_bond_conjugated,
         prop_bond_stereo,
     ):
-        aromatic_embeds = self.aromatic_embedding(prop_bond_aromatic)
-        conjugated_embeds = self.conjugated_embedding(prop_bond_conjugated)
-        stereo_embeds = self.stereo_embedding(prop_bond_stereo)
+        aromatic_embeds = self.aromatic_embedding(prop_bond_aromatic.long())
+        conjugated_embeds = self.conjugated_embedding(prop_bond_conjugated.long())
+        stereo_embeds = self.stereo_embedding(prop_bond_stereo.long())
 
         prop_embedding = torch.cat(
             [

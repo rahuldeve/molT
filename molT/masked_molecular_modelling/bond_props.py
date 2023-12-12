@@ -49,17 +49,17 @@ class BondPropModellingHead(nn.Module):
 
             bond_aromatic_loss = F.cross_entropy(
                 bond_is_aromatic.view(-1, self.num_aromatic_type),
-                prop_bond_aromatic.reshape(-1),
+                prop_bond_aromatic.reshape(-1).long(),
             )
 
             bond_conjugated_loss = F.cross_entropy(
                 bond_is_conjugated.view(-1, self.num_conjugated_type),
-                prop_bond_conjugated.reshape(-1),
+                prop_bond_conjugated.reshape(-1).long(),
             )
 
             bond_stero_loss = F.cross_entropy(
                 bond_stereo.view(-1, self.num_stereo_types),
-                prop_bond_stereo.reshape(-1),
+                prop_bond_stereo.reshape(-1).long(),
             )
 
             loss = bond_aromatic_loss + bond_stero_loss + bond_conjugated_loss

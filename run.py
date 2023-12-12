@@ -22,13 +22,10 @@ def tokenize(entry, tokenizer):
     )
 
 
-def load_data():
-    ds = load_dataset("sagawa/ZINC-canonicalized")["validation"].select(range(5000))
-    return ds.train_test_split(seed=42)
-
-def preprocess(ds, tokenizer):
+def load_data(tokenizer):
+    ds = load_dataset("sagawa/ZINC-canonicalized")['validation'].select(range(5000)).train_test_split()
     tok_func = partial(tokenize, tokenizer=tokenizer)
-    ds = ds.map(tok_func, num_proc=2)
+    ds = ds.map(tok_func, num_proc=8)
     return ds
 
 
@@ -87,8 +84,7 @@ if __name__ == "__main__":
     model = MolTForMaskedMM(model_config)
 
     # try to use datasets caching below
-    ds = load_data()
-    ds = preprocess(ds, tokenizer)
+    ds = load_data(tokenizer)
     # accelerator.wait_for_everyone()
 
     tokenizer.pad_token = tokenizer.eos_token

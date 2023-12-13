@@ -29,7 +29,7 @@ class AtomPropertyEmbedder(nn.Module):
 
     def forward(
         self,
-        token_type_ids,
+        atom_mask,
         prop_atom_in_ring,
         prop_atom_charge,
         prop_atom_hybridization,
@@ -50,7 +50,7 @@ class AtomPropertyEmbedder(nn.Module):
         )
 
         # zero out any calculated property that is not a atom
-        prop_embedding[~(token_type_ids == TokenType.ATOM)] = 0.0
+        prop_embedding[~atom_mask] = 0.0
         return prop_embedding
 
 
@@ -74,7 +74,7 @@ class BondPropertyEmbedder(nn.Module):
 
     def forward(
         self,
-        token_type_ids,
+        bond_mask,
         prop_bond_aromatic,
         prop_bond_conjugated,
         prop_bond_stereo,
@@ -92,7 +92,7 @@ class BondPropertyEmbedder(nn.Module):
             dim=-1,
         )
         # zero out any calculated property that is not a bond
-        prop_embedding[~(token_type_ids == TokenType.BOND)] = 0.0
+        prop_embedding[~bond_mask] = 0.0
         return prop_embedding
 
 
@@ -105,9 +105,9 @@ class MolDescriptorEmbedder(nn.Module):
             len(self.desc_list) + 1, config.embedding_size, padding_idx=0
         )
 
-    def forward(self, input_embeddings, token_type_ids, mol_descriptors):
+    def forward(self, input_embeddings, mol_desc_mask, mol_descriptors):
         # there is only one embedding for now
-        mol_descriptor_token_mask = (token_type_ids == TokenType.DESC).unsqueeze(-1)
+        mol_descriptor_token_mask = mol_desc_mask.unsqueeze(-1)
         masked_input_embeddings = input_embeddings.masked_fill(
             ~mol_descriptor_token_mask, 0.0
         )
@@ -147,17 +147,20 @@ class MolTEmbeddings(nn.Module):
         pos_embeds_shape = (pos_embeds.shape[0], *(pos_embeds_shape[0].tolist()))
         pos_embeds = pos_embeds.reshape(pos_embeds_shape)
 
+        token_type_embeds = self.type_embeddings(token_type_ids)
+        atom_mask = token_type_ids == TokenType.ATOM
+        bond_mask = token_type_ids == TokenType.BOND
+        mol_desc_mask = token_type_ids == TokenType.DESC
+
         input_embeddings = self.embeddings(input_ids)
         input_embeddings += self.mol_descriptor_embeddings(
-            input_embeddings, token_type_ids, mol_desc
+            input_embeddings, mol_desc_mask, mol_desc
         )
-
-        token_type_embeds = self.type_embeddings(token_type_ids)
 
         atom_props = unpack_atom_properties(atom_props)
         bond_props = unpack_bond_properties(bond_props)
-        atom_prop_embeddings = self.atom_prop_embeddings(token_type_ids, **atom_props)
-        bond_prop_embeddings = self.bond_prop_embeddings(token_type_ids, **bond_props)
+        atom_prop_embeddings = self.atom_prop_embeddings(atom_mask, **atom_props)
+        bond_prop_embeddings = self.bond_prop_embeddings(bond_mask, **bond_props)
 
         prop_embeddings = atom_prop_embeddings + bond_prop_embeddings
 

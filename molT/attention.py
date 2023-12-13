@@ -2,9 +2,7 @@ from typing import Optional, Tuple
 import math
 import torch
 import torch.nn as nn
-from transformers import PretrainedConfig
 from transformers.pytorch_utils import (
-    apply_chunking_to_forward,
     find_pruneable_heads_and_indices,
     prune_linear_layer,
 )

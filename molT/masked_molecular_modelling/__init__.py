@@ -16,6 +16,7 @@ logger = logging.get_logger(__name__)
 class MolTForMaskedMM(MolTPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
+        self.config = config
 
         if config.is_decoder:
             logger.warning(

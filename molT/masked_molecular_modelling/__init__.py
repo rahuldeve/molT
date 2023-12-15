@@ -123,7 +123,7 @@ class MolTForMaskedMM(MolTPreTrainedModel):
                 molecule_modelling_loss
                 + atom_prop_loss
                 + bond_prop_loss
-                + 0.01 * mol_desc_loss
+                + 0.1 * mol_desc_loss
             )
 
         return MoleculeModellingOutput(

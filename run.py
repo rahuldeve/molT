@@ -1,17 +1,20 @@
-from datasets import load_dataset
-from molT import (
-    MolTConfig,
-    MolTTokenizer,
-    MolTForMaskedMM,
-    DataCollatorForMaskedMolecularModeling,
-)
+import os
+from datetime import datetime
 from functools import partial
-from transformers import Trainer, TrainingArguments
-from transformers.trainer_utils import SchedulerType
-from transformers import TrainerCallback
 
 from accelerate import Accelerator
+from datasets import load_dataset
+from transformers import Trainer, TrainerCallback, TrainingArguments
+from transformers.trainer_utils import SchedulerType
 
+from molT import (
+    DataCollatorForMaskedMolecularModeling,
+    MolTConfig,
+    MolTForMaskedMM,
+    MolTTokenizer,
+)
+
+os.environ["WANDB_PROJECT"] = "molt"
 
 def tokenize(entry, tokenizer):
     return tokenizer(
@@ -23,7 +26,7 @@ def tokenize(entry, tokenizer):
 
 
 def load_data(tokenizer):
-    ds = load_dataset("sagawa/ZINC-canonicalized")['validation'].select(range(5000)).train_test_split()
+    ds = load_dataset("sagawa/ZINC-canonicalized")['validation'].select(range(5000)).train_test_split(seed=42)
     tok_func = partial(tokenize, tokenizer=tokenizer)
     ds = ds.map(tok_func, num_proc=8)
     return ds
@@ -48,19 +51,19 @@ def train_func(model, ds, data_collator):
         weight_decay=0.01,
         push_to_hub=False,
         logging_steps=2,
+        eval_steps=4,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
-        eval_steps=4,
         gradient_accumulation_steps=64,
         warmup_ratio=0.1,
-        # report_to="tensorboard",
-        # dataloader_num_workers=4,
-        # lr_scheduler_type=SchedulerType.COSINE_WITH_RESTARTS,
+        report_to="wandb",
+        dataloader_num_workers=4,
+        lr_scheduler_type=SchedulerType.COSINE,
         data_seed=42,
+        run_name=f"molt_{datetime.now()}"
         # label_names = ['reg'],
         # load_best_model_at_end = True,
         # metric_for_best_model = "eval_loss",
-        max_grad_norm=0.5
         # greater_is_better = False
     )
 

@@ -1,5 +1,5 @@
 transformers
-datasets
+datasets==2.15.0
 accelerate
 rdkit
 scikit-learn

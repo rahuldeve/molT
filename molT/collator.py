@@ -59,6 +59,12 @@ def torch_mask_mol_descriptors(input_ids, mol_descriptor_mask, mlm_probability):
     masked_descriptor_tokens = torch.bernoulli(probability_matrix).bool()
     return masked_descriptor_tokens
 
+def torch_mask_target(input_ids, target_mask, mlm_probability):
+    probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
+    probability_matrix.masked_fill_(~target_mask, value=0.0)
+    masked_descriptor_tokens = torch.bernoulli(probability_matrix).bool()
+    return masked_descriptor_tokens
+
 
 @dataclass
 class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
@@ -92,6 +98,12 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         mol_descriptor_mask = token_type_ids == TokenType.DESC
         masked_mol_descriptor_tokens = torch_mask_mol_descriptors(
             input_ids, mol_descriptor_mask, self.mlm_probability
+        )
+
+        # mask target tokens
+        target_mask = token_type_ids == TokenType.TGT
+        masked_target_tokens = torch_mask_target(
+            input_ids, target_mask, self.mlm_probability
         )
 
         # We will use the typical mlm type masking/randomization for input_ids of atoms and bonds
@@ -132,7 +144,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
 
         batch["input_ids"] = input_ids
         batch["labels"] = labels
-        batch["mm_mask"] = masked_atom_bond_tokens | masked_mol_descriptor_tokens
+        batch["mm_mask"] = masked_atom_bond_tokens | masked_mol_descriptor_tokens | masked_target_tokens
         return batch
 
     def torch_call(

@@ -3,12 +3,14 @@ from typing import Optional, Tuple, Union
 import torch
 from transformers.utils import logging
 
+from ..utils import TokenType
 from ..tranformer import MolTModel, MolTPreTrainedModel
 from .atom_props import AtomPropModellingHead
 from .base import MoleculeModellingOutput
 from .bond_props import BondPropModellingHead
 from .mlm import TokenModellingHead
 from .mol_descriptors import MolDescriptorModellingHead
+from .target import TargetModellingHead
 
 logger = logging.get_logger(__name__)
 
@@ -29,6 +31,7 @@ class MolTForMaskedMM(MolTPreTrainedModel):
         self.atom_prop_head = AtomPropModellingHead(config)
         self.bond_prop_head = BondPropModellingHead(config)
         self.mol_desc_head = MolDescriptorModellingHead(config)
+        self.target_head = TargetModellingHead(config)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -45,7 +48,7 @@ class MolTForMaskedMM(MolTPreTrainedModel):
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
         mol_desc: Optional[torch.Tensor] = None,
-
+        target_values: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -55,7 +58,6 @@ class MolTForMaskedMM(MolTPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        
     ) -> Union[Tuple[torch.Tensor], MoleculeModellingOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -93,6 +95,9 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             mol_desc=MolDescriptorModellingHead.adjust_for_input(
                 mol_desc, mm_mask, token_type_ids
             ),
+            target_values=TargetModellingHead.adjust_for_input(
+                target_values, mm_mask, token_type_ids, self.training
+            ),
         )
 
         sequence_output = outputs[0]
@@ -112,6 +117,10 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             sequence_output, mol_desc, mm_mask, token_type_ids
         )
 
+        target_loss, pred_target_values = self.target_head(
+            sequence_output, target_values, mm_mask, token_type_ids
+        )
+
         loss = None
         if (
             molecule_modelling_loss is not None
@@ -124,6 +133,7 @@ class MolTForMaskedMM(MolTPreTrainedModel):
                 + atom_prop_loss
                 + bond_prop_loss
                 + mol_desc_loss
+                + target_loss
             )
 
         return MoleculeModellingOutput(
@@ -132,4 +142,9 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             atom_prop_loss=atom_prop_loss,
             bond_prop_loss=bond_prop_loss,
             mol_desc_loss=mol_desc_loss,
+            target_loss=target_loss,
+
+            target_mask=(token_type_ids == TokenType.TGT).long(),
+            pred_target_values=pred_target_values,
+            true_target_values=target_values,
         )

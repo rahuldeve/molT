@@ -1,7 +1,6 @@
 from transformers import PretrainedConfig
 import rdkit.Chem as Chem
 
-
 descriptors =[
     'MaxAbsEStateIndex',
     'MaxEStateIndex',
@@ -33,7 +32,6 @@ class MolTConfig(PretrainedConfig):
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
         max_position_embeddings=512,
-        # type_vocab_size=2,
         initializer_range=0.02,
         layer_norm_eps=1e-12,
         bos_token_id=0,
@@ -43,6 +41,7 @@ class MolTConfig(PretrainedConfig):
         use_cache=True,
         classifier_dropout=None,
         mlm_probability=0.15,
+        target_col_name = 'qed',
         **kwargs,
     ):
         super().__init__(
@@ -55,9 +54,9 @@ class MolTConfig(PretrainedConfig):
         pt = Chem.GetPeriodicTable()  # type: ignore
         self.atoms = [pt.GetElementSymbol(i) for i in range(1, 119)]
         self.bonds = list(Chem.rdchem.BondType.names.keys())
-        # self.mol_descriptors = ["qed", "MolWt"]
+        # make sure target is not presented as a molecule descriptor
         self.mol_descriptors = descriptors
-        self.num_special_tokens = 7
+        self.num_special_tokens = 8
 
         self.vocab_size = (
             len(self.atoms)
@@ -83,3 +82,5 @@ class MolTConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.classifier_dropout = classifier_dropout
         self.mlm_probability = mlm_probability
+        self.target_col_name = target_col_name
+        self.feature_names = list(set(descriptors) - set([target_col_name]))

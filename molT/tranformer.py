@@ -71,6 +71,7 @@ class MolTModel(MolTPreTrainedModel):
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
         mol_desc: Optional[torch.Tensor] = None,
+        target_values: Optional[torch.Tensor] = None,
         token_type_ids: Optional[torch.Tensor] = None,
 
         position_ids: Optional[torch.Tensor] = None,
@@ -201,6 +202,7 @@ class MolTModel(MolTPreTrainedModel):
             atom_props=atom_props,
             bond_props=bond_props,
             mol_desc=mol_desc,
+            target_values=target_values,
         )
 
         encoder_outputs = self.encoder(

@@ -8,6 +8,7 @@ class TokenType(IntEnum):
     BOND = 2
     FP = 3
     DESC = 4
+    TGT = 5
 
 
 def pack_atom_properties(

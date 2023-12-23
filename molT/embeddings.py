@@ -112,6 +112,20 @@ class MolDescriptorEmbedder(nn.Module):
         return masked_input_embeddings
 
 
+class RegressionTargetEmbedder(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input_embeddings, target_mask, target_values):
+        target_token_mask = target_mask.unsqueeze(-1)
+        masked_input_embeddings = input_embeddings.masked_fill(~target_token_mask, 0.0)
+        target_values = target_values.unsqueeze(-1)
+        # target values are regression values. The embedding of <target> token from input_embeddings
+        # marks it as a target to be learnt. Since target is a continious value xVal is used to encode the data
+        masked_input_embeddings *= target_values
+        return masked_input_embeddings
+
+
 class MolTEmbeddings(nn.Module):
     def __init__(self, config: MolTConfig):
         super().__init__()
@@ -121,6 +135,7 @@ class MolTEmbeddings(nn.Module):
         self.atom_prop_embeddings = AtomPropertyEmbedder(config)
         self.bond_prop_embeddings = BondPropertyEmbedder(config)
         self.mol_descriptor_embeddings = MolDescriptorEmbedder()
+        self.target_embedding = RegressionTargetEmbedder()
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -137,6 +152,7 @@ class MolTEmbeddings(nn.Module):
         atom_props,
         bond_props,
         mol_desc,
+        target_values,
         **kwargs
     ):
         pos_embeds_shape = (pos_embeds.shape[0], *(pos_embeds_shape[0].tolist()))
@@ -146,11 +162,13 @@ class MolTEmbeddings(nn.Module):
         atom_mask = token_type_ids == TokenType.ATOM
         bond_mask = token_type_ids == TokenType.BOND
         mol_desc_mask = token_type_ids == TokenType.DESC
+        target_mask = token_type_ids == TokenType.TGT
 
         input_embeddings = self.embeddings(input_ids)
         input_embeddings += self.mol_descriptor_embeddings(
             input_embeddings, mol_desc_mask, mol_desc
         )
+        input_embeddings += self.target_embedding(input_embeddings, target_mask, target_values)
 
         atom_props = unpack_atom_properties(atom_props)
         bond_props = unpack_bond_properties(bond_props)

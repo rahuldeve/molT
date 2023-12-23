@@ -150,6 +150,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         "morgan_fps",
         "atom_props",
         "bond_props",
+        "target_values",
     ]
 
     def __init__(
@@ -182,7 +183,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         atoms = config.atoms
         bonds = config.bonds
         mol_descriptors = config.mol_descriptors
+        self.target_token = "<target>"
 
+        # make target token a special token
         special_tokens = [
             self.bos_token,
             self.eos_token,
@@ -193,25 +196,6 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             self.mask_token,
         ]
 
-        # assert len(special_tokens) == config.num_special_tokens
-
-        # special_tokens_encoder_map = dict()
-        # for val in special_tokens:
-        #     idx = len(special_tokens_encoder_map)
-        #     if val in special_tokens_encoder_map:
-        #         special_tokens_encoder_map[val] = min(
-        #             idx, special_tokens_encoder_map[val]
-        #         )
-        #     else:
-        #         special_tokens_encoder_map[val] = idx
-
-        # atom_bond_token_encoder_map = {
-        #     k: idx + len(special_tokens_encoder_map)
-        #     for idx, k in enumerate(bonds + atoms)
-        # }
-
-        # self.encoder = special_tokens_encoder_map | atom_bond_token_encoder_map
-
         token_encoder = dict()
         for val in special_tokens:
             idx = len(token_encoder)
@@ -219,6 +203,8 @@ class MolTTokenizer(PreTrainedTokenizerBase):
                 token_encoder[val] = min(idx, token_encoder[val])
             else:
                 token_encoder[val] = idx
+
+        token_encoder[self.target_token] = len(token_encoder)
 
         for k in bonds + atoms:
             token_encoder[k] = len(token_encoder)
@@ -257,27 +243,6 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         **kwargs,
     ) -> List[str]:
         raise NotImplementedError()
-        # mol = Chem.MolFromSmiles(text)  # type: ignore
-        # # mol = Chem.AddHs(mol)  # type: ignore
-
-        # atoms, _ = get_atom_properties(mol)
-        # bonds, edge_list, _ = get_bond_properties(mol)
-        # tokens, atom_mask, bond_mask = generate_tokens_atom_mask_bond_mask(edge_list)
-
-        # # convert the tokens idxs to match token_mapping dictionary
-        # input_ids = np.zeros_like(tokens, dtype=np.uint)
-        # input_ids[atom_mask] = np.array(
-        #     [self.encoder[atoms[x]] for x in tokens[atom_mask]]
-        # )
-        # input_ids[bond_mask] = np.array(
-        #     [self.encoder[bonds[x]] for x in tokens[bond_mask]]
-        # )
-
-        # input_ids = input_ids.tolist()
-        # if add_special_tokens:
-        #     input_ids = [self.cls_token_id] + input_ids
-
-        # return [self.decoder[x] for x in input_ids]
 
     def _decode(
         self,
@@ -354,10 +319,10 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         token_type_ids[bond_mask] = TokenType.BOND
 
         # append mol_prop tokens
-        mol_desc = np.array([kwargs[desc] for desc in self.config.mol_descriptors])
-        n_mol_desc = len(self.config.mol_descriptors)
+        mol_desc = np.array([kwargs[desc] for desc in self.config.feature_names])
+        n_mol_desc = len(self.config.feature_names)
 
-        mol_descriptor_ids = [self.encoder[x] for x in self.config.mol_descriptors]
+        mol_descriptor_ids = [self.encoder[x] for x in self.config.feature_names]
         input_ids = np.concatenate([input_ids, mol_descriptor_ids], axis=-1)
 
         mol_desc_pad_len = input_ids.shape[0] - mol_desc.shape[0]
@@ -372,6 +337,24 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         atom_props = np.pad(atom_props, ((0, 0), (0, n_mol_desc)), constant_values=0)  # type: ignore
         bond_props = np.pad(bond_props, ((0, 0), (0, n_mol_desc)), constant_values=0)  # type: ignore
 
+        # Add target value tokens
+        input_ids = np.pad(
+            input_ids, (0, 1), constant_values=self.encoder[self.target_token]
+        )
+
+        target_values = np.zeros_like(input_ids, dtype=float)
+        target_values[-1] = kwargs[self.config.target_col_name]
+
+        token_type_ids = np.pad(
+            token_type_ids, (0, 1), constant_values=TokenType.TGT.value
+        )
+
+        tokens = np.pad(tokens, (0, 1), constant_values=0)
+        pos_embeds = np.pad(pos_embeds, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
+        atom_props = np.pad(atom_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
+        bond_props = np.pad(bond_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
+        mol_desc = np.pad(mol_desc, (0, 1), constant_values=0)  # type: ignore
+
         # convert to lists for easier processing later
         # flattening pos_embeds for compatiability with BatchEncoding and DataCollator
         # maybe do list conversion after special_tokens?
@@ -383,6 +366,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         atom_props = atom_props.tolist()
         bond_props = bond_props.tolist()
         mol_desc = mol_desc.tolist()
+        target_values = target_values.tolist()
 
         encoded_inputs = {
             "token_idxs": token_idxs,
@@ -393,6 +377,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             "atom_props": atom_props,
             "bond_props": bond_props,
             "mol_desc": mol_desc,
+            "target_values": target_values,
         }
 
         if truncation_strategy != TruncationStrategy.DO_NOT_TRUNCATE:
@@ -419,6 +404,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
 
             encoded_inputs["mol_desc"].insert(0, 0.0)
             encoded_inputs["mol_desc"].append(0.0)
+
+            encoded_inputs["target_values"].insert(0, 0.0)
+            encoded_inputs["target_values"].append(0.0)
 
             # encoded_inputs['pos_embeds'].insert(0, [0.0] * (2 * self.laplace_embedding_dim))
             # encoded_inputs['pos_embeds'].append([0.0] * (2 * self.laplace_embedding_dim))
@@ -651,6 +639,10 @@ class MolTTokenizer(PreTrainedTokenizerBase):
                     "mol_desc"
                 ]  # type: ignore
 
+                encoded_inputs["target_values"] = [0] * difference + encoded_inputs[
+                    "target_values"
+                ]  # type: ignore
+
             elif self.padding_side == "right":
                 encoded_inputs["input_ids"] = (
                     encoded_inputs["input_ids"] + [self.pad_token_id] * difference  # type: ignore
@@ -688,6 +680,10 @@ class MolTTokenizer(PreTrainedTokenizerBase):
 
                 encoded_inputs["mol_desc"] = (
                     encoded_inputs["mol_desc"] + [0] * difference  # type: ignore
+                )
+
+                encoded_inputs["target_values"] = (
+                    encoded_inputs["target_values"] + [0] * difference  # type: ignore
                 )
 
             else:

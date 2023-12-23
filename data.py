@@ -34,7 +34,7 @@ def scale_batch(batch, scaler):
 
 
 def generate_and_scale_mol_descriptors(
-    ds, descriptor_names, num_samples=10_000, num_proc=8
+    ds, descriptor_names, num_samples=10_000, num_proc=None
 ):
     ds = ds.map(
         generate_rdkit_descriptors,
@@ -48,8 +48,6 @@ def generate_and_scale_mol_descriptors(
 
     scaler = StandardScaler().set_output(transform="pandas")
     scaler = scaler.fit(random_samples)  # type: ignore
-
-    
 
     ds = ds.map(
         scale_batch,

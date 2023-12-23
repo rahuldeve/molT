@@ -7,6 +7,7 @@ from datasets import load_dataset
 from transformers import Trainer, TrainerCallback, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
+from data import generate_and_scale_mol_descriptors
 from molT import (
     DataCollatorForMaskedMolecularModeling,
     MolTConfig,
@@ -16,20 +17,17 @@ from molT import (
 
 os.environ["WANDB_PROJECT"] = "molt"
 
+
 def tokenize(entry, tokenizer):
+    entry = dict(entry)
+    smiles = entry.pop("smiles")
     return tokenizer(
-        entry["smiles"],
+        smiles,
         truncation=False,
         return_attention_mask=True,
         return_special_tokens_mask=True,
+        **entry,
     )
-
-
-def load_data(tokenizer):
-    ds = load_dataset("sagawa/ZINC-canonicalized")['validation'].select(range(300_000)).train_test_split(seed=42)
-    tok_func = partial(tokenize, tokenizer=tokenizer)
-    ds = ds.map(tok_func, num_proc=8)
-    return ds
 
 
 def fn_metrics(eval_pred):
@@ -87,8 +85,15 @@ if __name__ == "__main__":
     tokenizer = MolTTokenizer(model_config)
     model = MolTForMaskedMM(model_config)
 
-    # try to use datasets caching below
-    ds = load_data(tokenizer)
+    ds = (
+        load_dataset("sagawa/ZINC-canonicalized")["validation"]
+        .select(range(300_000))
+        .train_test_split(seed=42)
+    )
+
+    ds, _ = generate_and_scale_mol_descriptors(
+        ds, model_config.mol_descriptors, num_samples=100_000, num_proc=16
+    )
     # accelerator.wait_for_everyone()
 
     tokenizer.pad_token = tokenizer.eos_token

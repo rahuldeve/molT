@@ -66,12 +66,6 @@ def get_lp_embeddings(adj_mat, k, flip_signs=True):
     return eig_vec
 
 
-def get_mol_desc(mol, descriptor_names):
-    relevant_descriptors = filter(lambda x: x[0] in descriptor_names, _descList)
-    descriptor_funcs = (x[1] for x in relevant_descriptors)
-    return np.array([f(mol) for f in descriptor_funcs])
-
-
 def get_atom_properties(mol):
     atoms = []
     in_ring = []
@@ -360,7 +354,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         token_type_ids[bond_mask] = TokenType.BOND
 
         # append mol_prop tokens
-        mol_desc = get_mol_desc(mol, self.config.mol_descriptors)
+        mol_desc = np.array([kwargs[desc] for desc in self.config.mol_descriptors])
         n_mol_desc = len(self.config.mol_descriptors)
 
         mol_descriptor_ids = [self.encoder[x] for x in self.config.mol_descriptors]

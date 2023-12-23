@@ -1,0 +1,7 @@
+transformers
+datasets
+accelerate
+rdkit
+scikit-learn
+wandb
+nvitop

@@ -1,5 +1,5 @@
 import os
-
+from functools import partial
 from datasets import load_dataset
 from sklearn import metrics
 from transformers import Trainer, TrainingArguments
@@ -114,6 +114,9 @@ if __name__ == "__main__":
     ds, _ = generate_and_scale_mol_descriptors(
         ds, model_config.mol_descriptors, num_samples=250_000, num_proc=32
     )
+
+    tok_func = partial(tokenize, tokenizer=tokenizer)
+    ds = ds.map(tok_func, num_proc=32)
 
     tokenizer.pad_token = tokenizer.eos_token
     data_collator = DataCollatorForMaskedMolecularModeling(

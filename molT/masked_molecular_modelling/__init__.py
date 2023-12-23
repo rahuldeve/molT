@@ -3,8 +3,8 @@ from typing import Optional, Tuple, Union
 import torch
 from transformers.utils import logging
 
-from ..utils import TokenType
 from ..tranformer import MolTModel, MolTPreTrainedModel
+from ..utils import TokenType
 from .atom_props import AtomPropModellingHead
 from .base import MoleculeModellingOutput
 from .bond_props import BondPropModellingHead
@@ -85,7 +85,6 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-
             atom_props=AtomPropModellingHead.adjust_for_input(
                 atom_props, mm_mask, token_type_ids
             ),
@@ -143,8 +142,7 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             bond_prop_loss=bond_prop_loss,
             mol_desc_loss=mol_desc_loss,
             target_loss=target_loss,
-
-            target_mask=(token_type_ids == TokenType.TGT).long(),
+            target_mask=(token_type_ids == TokenType.TGT).long(),  # type: ignore
             pred_target_values=pred_target_values,
-            true_target_values=target_values,
+            true_target_values=target_values,  # type: ignore
         )

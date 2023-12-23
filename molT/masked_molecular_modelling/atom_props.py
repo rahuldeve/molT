@@ -2,8 +2,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from rdkit.Chem.rdchem import ChiralType, HybridizationType
 
-from .base import ModellingHead
 from ..utils import TokenType, unpack_atom_properties
+from .base import ModellingHead
 
 
 class AtomPropModellingHead(nn.Module):

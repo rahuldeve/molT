@@ -37,7 +37,7 @@ class ModellingHead(nn.Module):
         x = self.decoder(x)
 
         return x
-    
+
 
 @dataclass
 class MoleculeModellingOutput(ModelOutput):
@@ -51,7 +51,3 @@ class MoleculeModellingOutput(ModelOutput):
     target_mask: Optional[torch.FloatTensor] = None
     pred_target_values: Optional[torch.FloatTensor] = None
     true_target_values: Optional[torch.FloatTensor] = None
-    
-    # logits: Optional[torch.FloatTensor] = None
-    # hidden_states: Optional[torch.FloatTensor] = None
-    # attentions: Optional[torch.FloatTensor] = None

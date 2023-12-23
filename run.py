@@ -1,12 +1,8 @@
 import os
-from datetime import datetime
-from functools import partial
 
-import numpy as np
-from accelerate import Accelerator
 from datasets import load_dataset
 from sklearn import metrics
-from transformers import Trainer, TrainerCallback, TrainingArguments
+from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
 from data import generate_and_scale_mol_descriptors
@@ -32,12 +28,6 @@ def tokenize(entry, tokenizer):
     )
 
 
-def extract_target_values(pred_target_values, true_target_values, target_mask):
-    y_true = true_target_values[target_mask]
-    y_pred = pred_target_values[target_mask]
-    return y_true, y_pred
-
-
 def fn_metrics(eval_pred):
     (
         mm_loss,
@@ -45,7 +35,6 @@ def fn_metrics(eval_pred):
         bond_prop_loss,
         mol_desc_loss,
         target_loss,
-
         target_mask,
         pred_target_values,
         true_target_values,
@@ -56,11 +45,8 @@ def fn_metrics(eval_pred):
     pred_target_values[~target_mask] = 0.0
     true_target_values[~target_mask] = 0.0
 
-    y_true, y_pred = extract_target_values(
-        pred_target_values, 
-        true_target_values,
-        target_mask,
-    )
+    y_true = true_target_values[target_mask]
+    y_pred = pred_target_values[target_mask]
 
     r2_score = metrics.r2_score(y_true, y_pred)
     mae = metrics.mean_absolute_error(y_true, y_pred)
@@ -72,10 +58,9 @@ def fn_metrics(eval_pred):
         "bond_prop_loss": bond_prop_loss.mean(),
         "mol_desc_loss": mol_desc_loss.mean(),
         "target_loss": target_loss.mean(),
-
         "target_r2": r2_score,
         "target_mae": mae,
-        "target_mse": mse
+        "target_mse": mse,
     }
 
 
@@ -101,10 +86,6 @@ def train_func(model, ds, data_collator):
         dataloader_pin_memory=True,
         bf16=True,
         bf16_full_eval=True,
-        # label_names = ['reg'],
-        # load_best_model_at_end = True,
-        # metric_for_best_model = "eval_loss",
-        # greater_is_better = False
     )
 
     trainer = Trainer(
@@ -120,8 +101,6 @@ def train_func(model, ds, data_collator):
 
 
 if __name__ == "__main__":
-    # accelerator = Accelerator()
-
     model_config = MolTConfig()
     tokenizer = MolTTokenizer(model_config)
     model = MolTForMaskedMM(model_config)
@@ -135,7 +114,6 @@ if __name__ == "__main__":
     ds, _ = generate_and_scale_mol_descriptors(
         ds, model_config.mol_descriptors, num_samples=100_000, num_proc=16
     )
-    # accelerator.wait_for_everyone()
 
     tokenizer.pad_token = tokenizer.eos_token
     data_collator = DataCollatorForMaskedMolecularModeling(

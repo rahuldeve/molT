@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
+from rdkit.Chem.rdchem import ChiralType, HybridizationType, StereoType
 
 from .config import MolTConfig
-from rdkit.Chem.rdchem import HybridizationType, ChiralType, StereoType
 from .utils import TokenType, unpack_atom_properties, unpack_bond_properties
 
 
@@ -36,7 +36,9 @@ class AtomPropertyEmbedder(nn.Module):
     ):
         in_ring_embeds = self.in_ring_embedding(prop_atom_in_ring.long())
         charge_embedding = self.charge_embedding(prop_atom_charge.long())
-        hybridization_embedding = self.hybridization_embedding(prop_atom_hybridization.long())
+        hybridization_embedding = self.hybridization_embedding(
+            prop_atom_hybridization.long()
+        )
         chirality_embedding = self.chirality_embedding(prop_atom_chirality.long())
 
         prop_embedding = torch.cat(
@@ -144,7 +146,7 @@ class MolTEmbeddings(nn.Module):
         bond_props,
         mol_desc,
         target_values,
-        **kwargs
+        **kwargs,
     ):
         pos_embeds_shape = (pos_embeds.shape[0], *(pos_embeds_shape[0].tolist()))
         pos_embeds = pos_embeds.reshape(pos_embeds_shape)

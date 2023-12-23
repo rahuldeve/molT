@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .base import ModellingHead
 from ..utils import TokenType
+from .base import ModellingHead
 
 
 class TokenModellingHead(nn.Module):

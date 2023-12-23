@@ -1,24 +1,11 @@
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
+
 import torch
-from typing import Any, Optional, Tuple, List, Union, Dict, Mapping
 from transformers.data.data_collator import DataCollatorMixin
 from transformers.tokenization_utils import PreTrainedTokenizerBase
+
 from molT.utils import TokenType
-
-# def torch_weighted_mask_atoms(input_ids, atom_mask):
-#     ignore_mask = ~atom_mask
-#     masked_input_ids = torch.masked_fill(input_ids, ignore_mask, -1)
-#     probability_matrix = []
-#     # not sure how to vectorize below; counts is not respecting batch dimension
-#     for batch_idx in range(masked_input_ids.shape[0]):
-#         entry = masked_input_ids[batch_idx]
-#         _, item_mapping, counts = torch.unique(entry, return_inverse=True, return_counts=True)
-#         # zero out counts for -1 to calculate probabilities
-#         counts[0] = 0
-#         probs = counts / counts.sum()
-#         probability_matrix.append(torch.gather(probs, 0, item_mapping))
-
-#     probability_matrix = torch.stack(probability_matrix, dim=0)
 
 
 def torch_mask_atoms_bonds(
@@ -58,6 +45,7 @@ def torch_mask_mol_descriptors(input_ids, mol_descriptor_mask, mlm_probability):
     probability_matrix.masked_fill_(~mol_descriptor_mask, value=0.0)
     masked_descriptor_tokens = torch.bernoulli(probability_matrix).bool()
     return masked_descriptor_tokens
+
 
 def torch_mask_target(input_ids, target_mask, mlm_probability):
     probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
@@ -144,7 +132,11 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
 
         batch["input_ids"] = input_ids
         batch["labels"] = labels
-        batch["mm_mask"] = masked_atom_bond_tokens | masked_mol_descriptor_tokens | masked_target_tokens
+        batch["mm_mask"] = (
+            masked_atom_bond_tokens
+            | masked_mol_descriptor_tokens
+            | masked_target_tokens
+        )
         return batch
 
     def torch_call(

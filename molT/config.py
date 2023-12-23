@@ -1,24 +1,25 @@
-from transformers import PretrainedConfig
 import rdkit.Chem as Chem
+from transformers import PretrainedConfig
 
-descriptors =[
-    'MaxAbsEStateIndex',
-    'MaxEStateIndex',
-    'MinAbsEStateIndex',
-    'MinEStateIndex',
-    'qed',
-    'SPS',
-    'MolWt',
-    'HeavyAtomMolWt',
-    'ExactMolWt',
-    'NumValenceElectrons',
-    'NumRadicalElectrons',
-    'MaxPartialCharge',
-    'MinPartialCharge',
-    'AvgIpc',
-    'BalabanJ',
-    'BertzCT',
+descriptors = [
+    "MaxAbsEStateIndex",
+    "MaxEStateIndex",
+    "MinAbsEStateIndex",
+    "MinEStateIndex",
+    "qed",
+    "SPS",
+    "MolWt",
+    "HeavyAtomMolWt",
+    "ExactMolWt",
+    "NumValenceElectrons",
+    "NumRadicalElectrons",
+    "MaxPartialCharge",
+    "MinPartialCharge",
+    "AvgIpc",
+    "BalabanJ",
+    "BertzCT",
 ]
+
 
 class MolTConfig(PretrainedConfig):
     def __init__(
@@ -41,7 +42,7 @@ class MolTConfig(PretrainedConfig):
         use_cache=True,
         classifier_dropout=None,
         mlm_probability=0.15,
-        target_col_name = 'qed',
+        target_col_name="qed",
         **kwargs,
     ):
         super().__init__(
@@ -75,7 +76,6 @@ class MolTConfig(PretrainedConfig):
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.max_position_embeddings = max_position_embeddings
-        # self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.position_embedding_type = position_embedding_type

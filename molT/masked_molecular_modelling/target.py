@@ -26,7 +26,7 @@ class TargetModellingHead(nn.Module):
             final_mask = mm_mask & target_token_mask
         else:
             final_mask = target_token_mask
-        
+
         return torch.where(final_mask, 1.0, target_values)
 
     def forward(self, features, target_values, mm_mask, token_type_ids):

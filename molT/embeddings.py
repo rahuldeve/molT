@@ -29,7 +29,6 @@ class AtomPropertyEmbedder(nn.Module):
 
     def forward(
         self,
-        atom_mask,
         prop_atom_in_ring,
         prop_atom_charge,
         prop_atom_hybridization,
@@ -39,6 +38,7 @@ class AtomPropertyEmbedder(nn.Module):
         charge_embedding = self.charge_embedding(prop_atom_charge.long())
         hybridization_embedding = self.hybridization_embedding(prop_atom_hybridization.long())
         chirality_embedding = self.chirality_embedding(prop_atom_chirality.long())
+
         prop_embedding = torch.cat(
             [
                 in_ring_embeds,
@@ -49,8 +49,6 @@ class AtomPropertyEmbedder(nn.Module):
             dim=-1,
         )
 
-        # zero out any calculated property that is not a atom
-        prop_embedding[~atom_mask] = 0.0
         return prop_embedding
 
 
@@ -74,7 +72,6 @@ class BondPropertyEmbedder(nn.Module):
 
     def forward(
         self,
-        bond_mask,
         prop_bond_aromatic,
         prop_bond_conjugated,
         prop_bond_stereo,
@@ -91,8 +88,6 @@ class BondPropertyEmbedder(nn.Module):
             ],
             dim=-1,
         )
-        # zero out any calculated property that is not a bond
-        prop_embedding[~bond_mask] = 0.0
         return prop_embedding
 
 
@@ -101,15 +96,12 @@ class MolDescriptorEmbedder(nn.Module):
         super().__init__()
 
     def forward(self, input_embeddings, mol_desc_mask, mol_descriptors):
-        # there is only one embedding for now
-        mol_descriptor_token_mask = mol_desc_mask.unsqueeze(-1)
-        masked_input_embeddings = input_embeddings.masked_fill(
-            ~mol_descriptor_token_mask, 0.0
+        mol_desc_embeddings = torch.where(
+            mol_desc_mask.unsqueeze(-1),
+            input_embeddings * mol_descriptors.unsqueeze(-1),
+            0.0,
         )
-        # scale down mol_descriptors
-        mol_descriptors = torch.tanh(mol_descriptors).unsqueeze(-1)
-        masked_input_embeddings *= mol_descriptors
-        return masked_input_embeddings
+        return mol_desc_embeddings
 
 
 class RegressionTargetEmbedder(nn.Module):
@@ -117,13 +109,12 @@ class RegressionTargetEmbedder(nn.Module):
         super().__init__()
 
     def forward(self, input_embeddings, target_mask, target_values):
-        target_token_mask = target_mask.unsqueeze(-1)
-        masked_input_embeddings = input_embeddings.masked_fill(~target_token_mask, 0.0)
-        target_values = target_values.unsqueeze(-1)
-        # target values are regression values. The embedding of <target> token from input_embeddings
-        # marks it as a target to be learnt. Since target is a continious value xVal is used to encode the data
-        masked_input_embeddings *= target_values
-        return masked_input_embeddings
+        target_encoded_embeddings = torch.where(
+            target_mask.unsqueeze(-1),
+            input_embeddings * target_values.unsqueeze(-1),
+            0.0,
+        )
+        return target_encoded_embeddings
 
 
 class MolTEmbeddings(nn.Module):
@@ -159,21 +150,23 @@ class MolTEmbeddings(nn.Module):
         pos_embeds = pos_embeds.reshape(pos_embeds_shape)
 
         token_type_embeds = self.type_embeddings(token_type_ids)
-        atom_mask = token_type_ids == TokenType.ATOM
-        bond_mask = token_type_ids == TokenType.BOND
-        mol_desc_mask = token_type_ids == TokenType.DESC
-        target_mask = token_type_ids == TokenType.TGT
 
         input_embeddings = self.embeddings(input_ids)
+
+        mol_desc_mask = token_type_ids == TokenType.DESC
         input_embeddings += self.mol_descriptor_embeddings(
             input_embeddings, mol_desc_mask, mol_desc
         )
-        input_embeddings += self.target_embedding(input_embeddings, target_mask, target_values)
+
+        target_mask = token_type_ids == TokenType.TGT
+        input_embeddings += self.target_embedding(
+            input_embeddings, target_mask, target_values
+        )
 
         atom_props = unpack_atom_properties(atom_props)
         bond_props = unpack_bond_properties(bond_props)
-        atom_prop_embeddings = self.atom_prop_embeddings(atom_mask, **atom_props)
-        bond_prop_embeddings = self.bond_prop_embeddings(bond_mask, **bond_props)
+        atom_prop_embeddings = self.atom_prop_embeddings(**atom_props)
+        bond_prop_embeddings = self.bond_prop_embeddings(**bond_props)
 
         prop_embeddings = atom_prop_embeddings + bond_prop_embeddings
 

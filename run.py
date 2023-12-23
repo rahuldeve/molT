@@ -79,10 +79,10 @@ def train_func(model, ds, data_collator):
         gradient_accumulation_steps=16,
         warmup_ratio=0.1,
         report_to="wandb",
-        dataloader_num_workers=8,
+        dataloader_num_workers=16,
         lr_scheduler_type=SchedulerType.COSINE,
         data_seed=42,
-        run_name="molt_dev_v2",
+        run_name="molt_dev_v6",
         dataloader_pin_memory=True,
         bf16=True,
         bf16_full_eval=True,
@@ -107,17 +107,17 @@ if __name__ == "__main__":
 
     ds = (
         load_dataset("sagawa/ZINC-canonicalized")["validation"]
-        .select(range(300_000))
+        .select(range(500_000))
         .train_test_split(seed=42)
     )
 
     ds, _ = generate_and_scale_mol_descriptors(
-        ds, model_config.mol_descriptors, num_samples=100_000, num_proc=16
+        ds, model_config.mol_descriptors, num_samples=250_000, num_proc=32
     )
 
     tokenizer.pad_token = tokenizer.eos_token
     data_collator = DataCollatorForMaskedMolecularModeling(
-        tokenizer=tokenizer, mlm_probability=0.15
+        tokenizer=tokenizer, mlm_probability=model_config.mlm_probability
     )
 
     train_func(model, ds, data_collator)

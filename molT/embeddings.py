@@ -97,13 +97,8 @@ class BondPropertyEmbedder(nn.Module):
 
 
 class MolDescriptorEmbedder(nn.Module):
-    def __init__(self, config: MolTConfig):
+    def __init__(self):
         super().__init__()
-
-        self.desc_list = config.mol_descriptors
-        self.embeddings = nn.Embedding(
-            len(self.desc_list) + 1, config.embedding_size, padding_idx=0
-        )
 
     def forward(self, input_embeddings, mol_desc_mask, mol_descriptors):
         # there is only one embedding for now
@@ -125,7 +120,7 @@ class MolTEmbeddings(nn.Module):
         )
         self.atom_prop_embeddings = AtomPropertyEmbedder(config)
         self.bond_prop_embeddings = BondPropertyEmbedder(config)
-        self.mol_descriptor_embeddings = MolDescriptorEmbedder(config)
+        self.mol_descriptor_embeddings = MolDescriptorEmbedder()
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)

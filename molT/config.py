@@ -2,10 +2,23 @@ from transformers import PretrainedConfig
 import rdkit.Chem as Chem
 
 
-descriptors = [
+descriptors =[
+    'MaxAbsEStateIndex',
+    'MaxEStateIndex',
+    'MinAbsEStateIndex',
+    'MinEStateIndex',
     'qed',
-    'MolLogP',
-    'MolMR',
+    'SPS',
+    'MolWt',
+    'HeavyAtomMolWt',
+    'ExactMolWt',
+    'NumValenceElectrons',
+    'NumRadicalElectrons',
+    'MaxPartialCharge',
+    'MinPartialCharge',
+    'AvgIpc',
+    'BalabanJ',
+    'BertzCT',
 ]
 
 class MolTConfig(PretrainedConfig):

@@ -26,7 +26,7 @@ def tokenize(entry, tokenizer):
 
 
 def load_data(tokenizer):
-    ds = load_dataset("sagawa/ZINC-canonicalized")['validation'].select(range(5000)).train_test_split(seed=42)
+    ds = load_dataset("sagawa/ZINC-canonicalized")['validation'].select(range(300_000)).train_test_split(seed=42)
     tok_func = partial(tokenize, tokenizer=tokenizer)
     ds = ds.map(tok_func, num_proc=8)
     return ds
@@ -47,20 +47,21 @@ def train_func(model, ds, data_collator):
         output_dir="molT_runs",
         evaluation_strategy="steps",
         learning_rate=2e-4,
-        num_train_epochs=20,
+        num_train_epochs=4,
         weight_decay=0.01,
         push_to_hub=False,
         logging_steps=2,
         eval_steps=4,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=32,
-        gradient_accumulation_steps=64,
+        per_device_train_batch_size=128,
+        per_device_eval_batch_size=128,
+        gradient_accumulation_steps=16,
         warmup_ratio=0.1,
         report_to="wandb",
-        dataloader_num_workers=4,
+        dataloader_num_workers=8,
         lr_scheduler_type=SchedulerType.COSINE,
         data_seed=42,
-        run_name=f"molt_{datetime.now()}"
+        run_name=f"molt_dev_{datetime.now()}",
+        max_grad_norm=0.5,
         # label_names = ['reg'],
         # load_best_model_at_end = True,
         # metric_for_best_model = "eval_loss",

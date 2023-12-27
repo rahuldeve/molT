@@ -48,7 +48,7 @@ def train_func(model, ds, data_collator):
         dataloader_num_workers=16,
         lr_scheduler_type=SchedulerType.COSINE,
         data_seed=42,
-        run_name="molt_dev_333",
+        run_name="molt_cls",
         dataloader_pin_memory=True,
         # bf16=True,
         # bf16_full_eval=True,

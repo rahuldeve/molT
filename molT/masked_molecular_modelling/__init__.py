@@ -94,9 +94,9 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             mol_desc=MolDescriptorModellingHead.adjust_for_input(
                 mol_desc, mm_mask, token_type_ids
             ),
-            target_values=TargetModellingHead.adjust_for_input(
-                target_values, mm_mask, token_type_ids, self.training
-            ),
+            # target_values=TargetModellingHead.adjust_for_input(
+            #     target_values, mm_mask, token_type_ids, self.training
+            # ),
         )
 
         sequence_output = outputs[0]
@@ -116,9 +116,9 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             sequence_output, mol_desc, mm_mask, token_type_ids
         )
 
-        target_loss, pred_target_values = self.target_head(
-            sequence_output, target_values, mm_mask, token_type_ids
-        )
+        # target_loss, pred_target_values = self.target_head(
+        #     sequence_output, target_values, mm_mask, token_type_ids
+        # )
 
         loss = None
         if (
@@ -132,7 +132,7 @@ class MolTForMaskedMM(MolTPreTrainedModel):
                 + atom_prop_loss
                 + bond_prop_loss
                 + mol_desc_loss
-                + target_loss
+                # + target_loss
             )
 
         return MoleculeModellingOutput(
@@ -141,8 +141,44 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             atom_prop_loss=atom_prop_loss,
             bond_prop_loss=bond_prop_loss,
             mol_desc_loss=mol_desc_loss,
-            target_loss=target_loss,
-            target_mask=(token_type_ids == TokenType.TGT).long(),  # type: ignore
-            pred_target_values=pred_target_values,
-            true_target_values=target_values,  # type: ignore
+            # target_loss=target_loss,
+            # target_mask=(token_type_ids == TokenType.TGT).long(),  # type: ignore
+            # pred_target_values=pred_target_values,
+            # true_target_values=target_values,  # type: ignore
         )
+    
+    @staticmethod
+    def report_metrics(eval_results):
+        (
+            mm_loss,
+            atom_prop_loss,
+            bond_prop_loss,
+            mol_desc_loss,
+            # target_loss,
+            # target_mask,
+            # pred_target_values,
+            # true_target_values,
+        ) = eval_results.predictions
+
+        # target_mask[target_mask == -100] = 0
+        # target_mask = target_mask.astype(bool)
+        # pred_target_values[~target_mask] = 0.0
+        # true_target_values[~target_mask] = 0.0
+
+        # y_true = true_target_values[target_mask]
+        # y_pred = pred_target_values[target_mask]
+
+        # r2_score = metrics.r2_score(y_true, y_pred)
+        # mae = metrics.mean_absolute_error(y_true, y_pred)
+        # mse = metrics.mean_squared_error(y_true, y_pred)
+
+        return {
+            "mm_loss": mm_loss.mean(),
+            "atom_prop_loss": atom_prop_loss.mean(),
+            "bond_prop_loss": bond_prop_loss.mean(),
+            "mol_desc_loss": mol_desc_loss.mean(),
+            # "target_loss": target_loss.mean(),
+            # "target_r2": r2_score,
+            # "target_mae": mae,
+            # "target_mse": mse,
+        }

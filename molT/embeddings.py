@@ -128,7 +128,7 @@ class MolTEmbeddings(nn.Module):
         self.atom_prop_embeddings = AtomPropertyEmbedder(config)
         self.bond_prop_embeddings = BondPropertyEmbedder(config)
         self.mol_descriptor_embeddings = MolDescriptorEmbedder()
-        self.target_embedding = RegressionTargetEmbedder()
+        # self.target_embedding = RegressionTargetEmbedder()
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -160,10 +160,10 @@ class MolTEmbeddings(nn.Module):
             input_embeddings, mol_desc_mask, mol_desc
         )
 
-        target_mask = token_type_ids == TokenType.TGT
-        input_embeddings += self.target_embedding(
-            input_embeddings, target_mask, target_values
-        )
+        # target_mask = token_type_ids == TokenType.TGT
+        # input_embeddings += self.target_embedding(
+        #     input_embeddings, target_mask, target_values
+        # )
 
         atom_props = unpack_atom_properties(atom_props)
         bond_props = unpack_bond_properties(bond_props)

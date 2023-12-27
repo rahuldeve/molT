@@ -16,6 +16,8 @@ from transformers.tokenization_utils_base import (
     TruncationStrategy,
 )
 
+from itertools import chain
+
 from .config import MolTConfig
 from .utils import TokenType, pack_atom_properties, pack_bond_properties
 
@@ -96,24 +98,46 @@ def get_bond_properties(mol):
     return bonds, edge_list, properties
 
 
-def generate_pos_embeddings(tokens, lp_embeds, edge_list, atom_mask, bond_mask):
-    pos_embeds = np.zeros((tokens.shape[0], 2 * lp_embeds.shape[-1]))
-    pos_embeds[bond_mask, :] = lp_embeds[edge_list].reshape((edge_list.shape[0], -1))
-    pos_embeds[atom_mask, :] = lp_embeds[
-        np.repeat(tokens[atom_mask][:, None], 2, axis=-1)
-    ].reshape((edge_list.shape[0], -1))
-    return pos_embeds
+# def generate_pos_embeddings(tokens, lp_embeds, edge_list, atom_mask, bond_mask):
+#     pos_embeds = np.zeros((tokens.shape[0], 2 * lp_embeds.shape[-1]))
+#     pos_embeds[bond_mask, :] = lp_embeds[edge_list].reshape((edge_list.shape[0], -1))
+#     pos_embeds[atom_mask, :] = lp_embeds[
+#         np.repeat(tokens[atom_mask][:, None], 2, axis=-1)
+#     ].reshape((edge_list.shape[0], -1))
+#     return pos_embeds
 
 
-def generate_tokens_atom_mask_bond_mask(edge_list):
-    tokens = np.zeros(2 * edge_list.shape[0], dtype=np.uint)
-    atom_mask = np.zeros_like(tokens, dtype=bool)
-    atom_mask[0::2] = True
+# Test this function
+def generate_tokens_atom_bond_mask_pos_embeds(edge_list, lp_embeds):
+    tokens = []
+    atom_mask = []
+    pos_embeds = []
+    atoms_seen = set()
+    for bond_idx in range(edge_list.shape[0]):
+        st_atom_idx = edge_list[bond_idx, 0]
+        en_atom_idx = edge_list[bond_idx, 1]
+
+        if st_atom_idx not in atoms_seen:
+            tokens.append(st_atom_idx)
+            atom_mask.append(True)
+            pos_embeds.append([lp_embeds[st_atom_idx], lp_embeds[st_atom_idx]])
+            atoms_seen.add(st_atom_idx)
+
+        tokens.append(bond_idx)
+        atom_mask.append(False)
+        pos_embeds.append([lp_embeds[st_atom_idx], lp_embeds[en_atom_idx]])
+
+        if en_atom_idx not in atoms_seen:
+            tokens.append(en_atom_idx)
+            atom_mask.append(True)
+            atoms_seen.add(en_atom_idx)
+            pos_embeds.append([lp_embeds[en_atom_idx], lp_embeds[en_atom_idx]])
+
+    tokens = np.array(tokens, dtype=np.uint)
+    atom_mask = np.array(atom_mask, dtype=bool)
     bond_mask = ~atom_mask
-
-    tokens[atom_mask] = edge_list[:, 0]
-    tokens[bond_mask] = np.arange(edge_list.shape[0])
-    return tokens, atom_mask, bond_mask
+    pos_embeds = np.stack(pos_embeds, axis=0).reshape(-1, 2 * lp_embeds.shape[-1])
+    return tokens, atom_mask, bond_mask, pos_embeds
 
 
 class MolTTokenizer(PreTrainedTokenizerBase):
@@ -263,11 +287,15 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         atoms, atom_props = get_atom_properties(mol)
         bonds, edge_list, bond_props = get_bond_properties(mol)
 
-        token_idxs, atom_mask, bond_mask = generate_tokens_atom_mask_bond_mask(
-            edge_list
-        )
-        pos_embeds = generate_pos_embeddings(
-            token_idxs, lp_embeds, edge_list, atom_mask, bond_mask
+        (
+            token_idxs,
+            atom_mask,
+            bond_mask,
+            pos_embeds,
+        ) = generate_tokens_atom_bond_mask_pos_embeds(edge_list, lp_embeds)
+
+        assert set(chain.from_iterable(edge_list.tolist())) == set(
+            token_idxs[atom_mask].tolist()
         )
 
         # convert the tokens idxs to match token_mapping dictionary

@@ -36,5 +36,5 @@ class MolDescriptorModellingHead(nn.Module):
         mse_error = torch.pow(preds - mol_descriptors, 2)
         # zero out any token not in final_mask
         mse_error = mse_error.masked_fill(~final_mask, 0.0)
-        loss = mse_error.mean()
+        loss = mse_error.mean(dim=0).sum()
         return loss, preds.masked_fill(~mol_desc_token_mask, 0.0)

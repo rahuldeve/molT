@@ -36,7 +36,7 @@ def train_func(model, ds, data_collator):
         num_train_epochs=4,
         weight_decay=0.01,
         push_to_hub=False,
-        logging_steps=4,
+        logging_steps=8,
         eval_steps=32,
         per_device_train_batch_size=128,
         per_device_eval_batch_size=128,
@@ -46,7 +46,7 @@ def train_func(model, ds, data_collator):
         dataloader_num_workers=16,
         lr_scheduler_type=SchedulerType.COSINE,
         data_seed=42,
-        run_name="molt_mmm,
+        run_name="molt_mmm",
         dataloader_pin_memory=True,
         dataloader_drop_last=True
     )

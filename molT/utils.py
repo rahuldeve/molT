@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, auto
 import numpy as np
 
 
@@ -6,9 +6,8 @@ class TokenType(IntEnum):
     SPECIAL = 0
     ATOM = 1
     BOND = 2
-    FP = 3
-    DESC = 4
-    TGT = 5
+    FEAT = 3
+    TGT = 4
 
 
 def pack_atom_properties(

@@ -93,17 +93,17 @@ class BondPropertyEmbedder(nn.Module):
         return prop_embedding
 
 
-class MolDescriptorEmbedder(nn.Module):
+class MolFeatureEmbedder(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, input_embeddings, mol_desc_mask, mol_descriptors):
-        mol_desc_embeddings = torch.where(
-            mol_desc_mask.unsqueeze(-1),
-            input_embeddings * mol_descriptors.unsqueeze(-1),
+    def forward(self, input_embeddings, mol_feat_mask, mol_features):
+        mol_feature_embeddings = torch.where(
+            mol_feat_mask.unsqueeze(-1),
+            input_embeddings * mol_features.unsqueeze(-1),
             0.0,
         )
-        return mol_desc_embeddings
+        return mol_feature_embeddings
 
 
 class RegressionTargetEmbedder(nn.Module):
@@ -127,7 +127,7 @@ class MolTEmbeddings(nn.Module):
         )
         self.atom_prop_embeddings = AtomPropertyEmbedder(config)
         self.bond_prop_embeddings = BondPropertyEmbedder(config)
-        self.mol_descriptor_embeddings = MolDescriptorEmbedder()
+        self.mol_feature_embeddings = MolFeatureEmbedder()
         # self.target_embedding = RegressionTargetEmbedder()
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
@@ -144,7 +144,7 @@ class MolTEmbeddings(nn.Module):
         pos_embeds_shape,
         atom_props,
         bond_props,
-        mol_desc,
+        mol_features,
         target_values,
         **kwargs,
     ):
@@ -155,9 +155,9 @@ class MolTEmbeddings(nn.Module):
 
         input_embeddings = self.embeddings(input_ids)
 
-        mol_desc_mask = token_type_ids == TokenType.DESC
-        input_embeddings += self.mol_descriptor_embeddings(
-            input_embeddings, mol_desc_mask, mol_desc
+        mol_feat_mask = token_type_ids == TokenType.FEAT
+        input_embeddings += self.mol_feature_embeddings(
+            input_embeddings, mol_feat_mask, mol_features
         )
 
         # target_mask = token_type_ids == TokenType.TGT

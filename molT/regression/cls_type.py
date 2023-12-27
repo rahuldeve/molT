@@ -75,7 +75,7 @@ class CLSRegression(MolTPreTrainedModel):
         mm_mask: Optional[torch.Tensor] = None,
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
-        mol_desc: Optional[torch.Tensor] = None,
+        mol_features: Optional[torch.Tensor] = None,
         target_values: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
@@ -115,7 +115,7 @@ class CLSRegression(MolTPreTrainedModel):
             return_dict=return_dict,
             atom_props=atom_props,
             bond_props=bond_props,
-            mol_desc=mol_desc,
+            mol_features=mol_features,
         )
 
         sequence_output = outputs[0]

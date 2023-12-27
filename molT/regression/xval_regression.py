@@ -9,7 +9,7 @@ from ..masked_molecular_modelling.atom_props import AtomPropModellingHead
 from ..masked_molecular_modelling.base import MoleculeModellingOutput
 from ..masked_molecular_modelling.bond_props import BondPropModellingHead
 from ..masked_molecular_modelling.mlm import TokenModellingHead
-from ..masked_molecular_modelling.mol_descriptors import MolDescriptorModellingHead
+from ..masked_molecular_modelling.mol_features import MolFeatureModellingHead
 from ..masked_molecular_modelling.target import TargetModellingHead
 
 logger = logging.get_logger(__name__)
@@ -21,7 +21,7 @@ class XValRegressionOutput(ModelOutput):
     molecule_modelling_loss: Optional[torch.FloatTensor] = None
     atom_prop_loss: Optional[torch.FloatTensor] = None
     bond_prop_loss: Optional[torch.FloatTensor] = None
-    mol_desc_loss: Optional[torch.FloatTensor] = None
+    mol_feature_loss: Optional[torch.FloatTensor] = None
     target_loss: Optional[torch.FloatTensor] = None
 
     pred_target_values: Optional[torch.FloatTensor] = None
@@ -43,7 +43,7 @@ class XValRegression(MolTPreTrainedModel):
         self.token_head = TokenModellingHead(config)
         self.atom_prop_head = AtomPropModellingHead(config)
         self.bond_prop_head = BondPropModellingHead(config)
-        self.mol_desc_head = MolDescriptorModellingHead(config)
+        self.mol_feat_head = MolFeatureModellingHead(config)
         self.target_head = TargetModellingHead(config)
 
         # Initialize weights and apply final processing
@@ -60,7 +60,7 @@ class XValRegression(MolTPreTrainedModel):
         mm_mask: Optional[torch.Tensor] = None,
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
-        mol_desc: Optional[torch.Tensor] = None,
+        mol_features: Optional[torch.Tensor] = None,
         target_values: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
@@ -104,8 +104,8 @@ class XValRegression(MolTPreTrainedModel):
             bond_props=BondPropModellingHead.adjust_for_input(
                 bond_props, mm_mask, token_type_ids
             ),
-            mol_desc=MolDescriptorModellingHead.adjust_for_input(
-                mol_desc, mm_mask, token_type_ids
+            mol_features=MolFeatureModellingHead.adjust_for_input(
+                mol_features, mm_mask, token_type_ids
             ),
             target_values=TargetModellingHead.adjust_for_input(
                 target_values, mm_mask, token_type_ids, self.training
@@ -125,8 +125,8 @@ class XValRegression(MolTPreTrainedModel):
             sequence_output, bond_props, mm_mask, token_type_ids
         )
 
-        mol_desc_loss, _ = self.mol_desc_head(
-            sequence_output, mol_desc, mm_mask, token_type_ids
+        mol_feature_loss, _ = self.mol_feat_head(
+            sequence_output, mol_features, mm_mask, token_type_ids
         )
 
         target_loss, pred_target_values = self.target_head(
@@ -138,13 +138,13 @@ class XValRegression(MolTPreTrainedModel):
             molecule_modelling_loss is not None
             and atom_prop_loss is not None
             and bond_prop_loss is not None
-            and mol_desc_loss is not None
+            and mol_feature_loss is not None
         ):
             loss = (
                 molecule_modelling_loss
                 + atom_prop_loss
                 + bond_prop_loss
-                + mol_desc_loss
+                + mol_feature_loss
                 + target_loss
             )
 
@@ -153,7 +153,7 @@ class XValRegression(MolTPreTrainedModel):
             molecule_modelling_loss=molecule_modelling_loss,
             atom_prop_loss=atom_prop_loss,
             bond_prop_loss=bond_prop_loss,
-            mol_desc_loss=mol_desc_loss,
+            mol_feature_loss=mol_feature_loss,
             target_loss=target_loss,
             pred_target_values=pred_target_values,
             true_target_values=target_values,  # type: ignore
@@ -165,7 +165,7 @@ class XValRegression(MolTPreTrainedModel):
             mm_loss,
             atom_prop_loss,
             bond_prop_loss,
-            mol_desc_loss,
+            mol_feature_loss,
             target_loss,
             pred_target_values,
             true_target_values,
@@ -182,7 +182,7 @@ class XValRegression(MolTPreTrainedModel):
             "mm_loss": mm_loss.mean(),
             "atom_prop_loss": atom_prop_loss.mean(),
             "bond_prop_loss": bond_prop_loss.mean(),
-            "mol_desc_loss": mol_desc_loss.mean(),
+            "mol_feature_loss": mol_feature_loss.mean(),
             "target_loss": target_loss.mean(),
             "target_r2": r2_score,
             "target_mae": mae,

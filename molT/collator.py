@@ -40,18 +40,18 @@ def torch_mask_atoms_bonds(
     return masked_tokens
 
 
-def torch_mask_mol_descriptors(input_ids, mol_descriptor_mask, mlm_probability):
+def torch_mask_mol_features(input_ids, mol_feature_mask, mlm_probability):
     probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
-    probability_matrix.masked_fill_(~mol_descriptor_mask, value=0.0)
-    masked_descriptor_tokens = torch.bernoulli(probability_matrix).bool()
-    return masked_descriptor_tokens
+    probability_matrix.masked_fill_(~mol_feature_mask, value=0.0)
+    masked_feature_tokens = torch.bernoulli(probability_matrix).bool()
+    return masked_feature_tokens
 
 
 def torch_mask_target(input_ids, target_mask, mlm_probability):
     probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
     probability_matrix.masked_fill_(~target_mask, value=0.0)
-    masked_descriptor_tokens = torch.bernoulli(probability_matrix).bool()
-    return masked_descriptor_tokens
+    masked_target_tokens = torch.bernoulli(probability_matrix).bool()
+    return masked_target_tokens
 
 
 @dataclass
@@ -83,9 +83,9 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         )
 
         # mask mol descriptor tokens
-        mol_descriptor_mask = token_type_ids == TokenType.DESC
-        masked_mol_descriptor_tokens = torch_mask_mol_descriptors(
-            input_ids, mol_descriptor_mask, self.mlm_probability
+        mol_feature_mask = token_type_ids == TokenType.FEAT
+        masked_mol_feature_tokens = torch_mask_mol_features(
+            input_ids, mol_feature_mask, self.mlm_probability
         )
 
         # mask target tokens
@@ -134,7 +134,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         batch["labels"] = labels
         batch["mm_mask"] = (
             masked_atom_bond_tokens
-            | masked_mol_descriptor_tokens
+            | masked_mol_feature_tokens
             | masked_target_tokens
         )
         return batch
@@ -144,42 +144,10 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
     ) -> Dict[str, Any]:
         # Handle dict or lists with proper padding and conversion to tensor.
         batch = self.tokenizer.pad(
-            examples,
+            examples, # type: ignore
             return_tensors="pt",
             pad_to_multiple_of=self.pad_to_multiple_of,
         )
 
         batch = self.torch_mask_tokens(batch)
         return batch
-
-
-# # handle masking of duplicate atom tokens (suplicate here meaining having same token idxs)
-# mask atoms
-# atom_mask = token_type_ids == TokenType.ATOM
-# bond_mask = token_type_ids == TokenType.BOND
-# ignore_mask = ~atom_mask
-# probability_matrix = torch.full_like(
-#     input_ids, self.mlm_probability, dtype=torch.float
-# )
-
-# probability_matrix.masked_fill_(ignore_mask, value=0.0)
-# masked_atom_tokens = torch.bernoulli(probability_matrix).bool()
-#         masked_tokens = masked_atom_tokens.clone()
-#         # Not sure how to vectorize the loop
-#         for batch_idx in range(masked_tokens.shape[0]):
-#             batch_token_idxs = token_idxs[batch_idx]
-#             batch_masked_atom_tokens = masked_atom_tokens[batch_idx]
-#             batch_token_types = token_type_ids[batch_idx]
-
-#             batch_masked_atom_tokens = (
-#                 batch_token_idxs[batch_masked_atom_tokens].unsqueeze(-1)
-#                 == batch_token_idxs
-#             ).any(dim=0) & (batch_token_types == TokenType.ATOM)
-
-#             # mask all outgoing bonds from masked atoms; since every atom token is followed up with a
-#             # bond token that is attached to the atom token, we can use torch.roll to mask the attached bond
-#             masked_tokens[
-#                 batch_idx
-#             ] = batch_masked_atom_tokens | batch_masked_atom_tokens.roll(1) & ~(
-#                 batch_token_idxs == TokenType.SPECIAL
-#             )

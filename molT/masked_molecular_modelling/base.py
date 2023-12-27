@@ -45,7 +45,7 @@ class MoleculeModellingOutput(ModelOutput):
     molecule_modelling_loss: Optional[torch.FloatTensor] = None
     atom_prop_loss: Optional[torch.FloatTensor] = None
     bond_prop_loss: Optional[torch.FloatTensor] = None
-    mol_desc_loss: Optional[torch.FloatTensor] = None
+    mol_feature_loss: Optional[torch.FloatTensor] = None
     target_loss: Optional[torch.FloatTensor] = None
 
     target_mask: Optional[torch.FloatTensor] = None

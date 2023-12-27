@@ -70,7 +70,7 @@ class MolTModel(MolTPreTrainedModel):
         pos_embeds_shape: Optional[torch.Tensor] = None,
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
-        mol_desc: Optional[torch.Tensor] = None,
+        mol_features: Optional[torch.Tensor] = None,
         target_values: Optional[torch.Tensor] = None,
         token_type_ids: Optional[torch.Tensor] = None,
 
@@ -201,7 +201,7 @@ class MolTModel(MolTPreTrainedModel):
             past_key_values_length=past_key_values_length,
             atom_props=atom_props,
             bond_props=bond_props,
-            mol_desc=mol_desc,
+            mol_features=mol_features,
             target_values=target_values,
         )
 

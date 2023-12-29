@@ -32,7 +32,7 @@ def train_func(model, ds, data_collator):
     training_args = TrainingArguments(
         output_dir="molT_runs",
         evaluation_strategy="steps",
-        learning_rate=1e-4,
+        learning_rate=2e-4,
         num_train_epochs=4,
         weight_decay=0.01,
         push_to_hub=False,
@@ -48,7 +48,8 @@ def train_func(model, ds, data_collator):
         data_seed=42,
         run_name="molt_mmm",
         dataloader_pin_memory=True,
-        dataloader_drop_last=True
+        dataloader_drop_last=True,
+        max_grad_norm=0.5,
     )
 
     trainer = Trainer(

@@ -25,7 +25,7 @@ class MolTConfig(PretrainedConfig):
     def __init__(
         self,
         laplace_embeds_size=12,
-        embedding_size=768,
+        embedding_size=368,
         num_hidden_layers=4,
         num_attention_heads=12,
         intermediate_size_multiplier=4,

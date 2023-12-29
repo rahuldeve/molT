@@ -13,7 +13,7 @@ from molT import (
     MolTTokenizer,
 )
 
-os.environ["WANDB_PROJECT"] = "molt_ablation"
+os.environ["WANDB_PROJECT"] = "molt"
 
 
 def tokenize(entry, tokenizer):
@@ -32,21 +32,21 @@ def train_func(model, ds, data_collator):
     training_args = TrainingArguments(
         output_dir="molT_runs",
         evaluation_strategy="steps",
-        learning_rate=2e-4,
+        learning_rate=1e-4,
         num_train_epochs=4,
         weight_decay=0.01,
         push_to_hub=False,
         logging_steps=8,
         eval_steps=32,
-        per_device_train_batch_size=128,
-        per_device_eval_batch_size=128,
-        gradient_accumulation_steps=16,
+        per_device_train_batch_size=512,
+        per_device_eval_batch_size=512,
+        gradient_accumulation_steps=8,
         warmup_ratio=0.1,
         report_to="wandb",
         dataloader_num_workers=16,
-        lr_scheduler_type=SchedulerType.COSINE,
+        # lr_scheduler_type=SchedulerType.COSINE,
         data_seed=42,
-        run_name="molt_mmm",
+        run_name="molt_large",
         dataloader_pin_memory=True,
         dataloader_drop_last=True,
         max_grad_norm=0.5,
@@ -72,12 +72,12 @@ if __name__ == "__main__":
 
     ds = (
         load_dataset("sagawa/ZINC-canonicalized")["validation"]
-        .select(range(100_000))
+        .select(range(1_000_000))
         .train_test_split(seed=42)
     )
 
     ds, _ = generate_and_scale_mol_descriptors(
-        ds, model_config.mol_descriptors, num_samples=50_000, num_proc=32
+        ds, model_config.mol_descriptors, num_samples=500_000, num_proc=32
     )
 
     tok_func = partial(tokenize, tokenizer=tokenizer)

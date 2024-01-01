@@ -119,12 +119,44 @@ class RegressionTargetEmbedder(nn.Module):
         return target_encoded_embeddings
 
 
+def batched_select(batch_idx, batch_lp_embeds):
+    return batch_lp_embeds[batch_idx]
+
+class PositionEmbedder(nn.Module):
+    def __init__(self, config) -> None:
+        super().__init__()
+        self.config = config
+        self.vectorized_batch_select = torch.vmap(batched_select)
+
+    @torch.no_grad()
+    def forward(self, pos_embed_idxs, lp_embeds, token_type_ids):
+        B, L = token_type_ids.shape
+        pos_embed_idxs = pos_embed_idxs.reshape((B, L, -1)).long()
+        lp_embeds = lp_embeds.reshape((B, L, -1))
+
+        if self.training:
+            random_signs = -1 + 2 * torch.randint(0, 2, (B, L), device=lp_embeds.device).unsqueeze(-1)
+            lp_embeds = lp_embeds * random_signs
+
+        pos_embeds = self.vectorized_batch_select(pos_embed_idxs, lp_embeds)
+        pos_embeds = pos_embeds.flatten(-2, -1)
+
+        atom_mask = token_type_ids == TokenType.ATOM
+        bond_mask = token_type_ids == TokenType.BOND
+        atom_bond_mask = atom_mask | bond_mask
+        pos_embeds = torch.where(atom_bond_mask.unsqueeze(-1), pos_embeds, 0.0)
+        return pos_embeds
+
+
+
+
 class MolTEmbeddings(nn.Module):
     def __init__(self, config: MolTConfig):
         super().__init__()
         self.embeddings = nn.Embedding(
             config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id
         )
+        self.pos_embeddings = PositionEmbedder(config)
         self.atom_prop_embeddings = AtomPropertyEmbedder(config)
         self.bond_prop_embeddings = BondPropertyEmbedder(config)
         self.mol_feature_embeddings = MolFeatureEmbedder()
@@ -140,16 +172,19 @@ class MolTEmbeddings(nn.Module):
         self,
         input_ids,
         token_type_ids,
-        pos_embeds,
-        pos_embeds_shape,
+        pos_embed_idxs,
+        pos_embed_idxs_shape,
+        lp_embeds,
         atom_props,
         bond_props,
         mol_features,
         target_values,
         **kwargs,
     ):
-        pos_embeds_shape = (pos_embeds.shape[0], *(pos_embeds_shape[0].tolist()))
-        pos_embeds = pos_embeds.reshape(pos_embeds_shape)
+        
+        
+        pos_embeds = self.pos_embeddings(pos_embed_idxs, lp_embeds, token_type_ids)
+        
 
         token_type_embeds = self.type_embeddings(token_type_ids)
 

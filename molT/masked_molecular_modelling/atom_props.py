@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from rdkit.Chem.rdchem import ChiralType, HybridizationType
@@ -20,6 +21,7 @@ class AtomPropModellingHead(nn.Module):
         self.charge_head = ModellingHead(self.num_charge_types, config)
 
     @staticmethod
+    @torch.no_grad()
     def adjust_for_input(atom_props, mm_mask, token_type_ids):
         atom_mask = token_type_ids == TokenType.ATOM
         final_mask = atom_mask & mm_mask
@@ -27,6 +29,7 @@ class AtomPropModellingHead(nn.Module):
         return atom_props.masked_fill(final_mask.unsqueeze(1), 0.0)
 
     @staticmethod
+    @torch.no_grad()
     def adjust_for_loss(atom_props, mm_mask, token_type_ids):
         atom_mask = token_type_ids == TokenType.ATOM
         final_mask = atom_mask & mm_mask

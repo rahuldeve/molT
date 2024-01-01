@@ -20,6 +20,7 @@ class MolFeatureModellingHead(nn.Module):
         self.exp_dive = ExpDive()
 
     @staticmethod
+    @torch.no_grad()
     def adjust_for_input(mol_features, mm_mask, token_type_ids):
         mol_feature_token_mask = token_type_ids == TokenType.FEAT
         final_mask = mm_mask & mol_feature_token_mask

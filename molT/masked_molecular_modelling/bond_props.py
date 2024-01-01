@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from rdkit.Chem.rdchem import StereoType
@@ -18,6 +19,7 @@ class BondPropModellingHead(nn.Module):
         self.stereo_head = ModellingHead(self.num_stereo_types, config)
 
     @staticmethod
+    @torch.no_grad()
     def adjust_for_input(bond_props, mm_mask, token_type_ids):
         bond_mask = token_type_ids == TokenType.BOND
         final_mask = bond_mask & mm_mask
@@ -25,6 +27,7 @@ class BondPropModellingHead(nn.Module):
         return bond_props.masked_fill(final_mask.unsqueeze(1), 0.0)
 
     @staticmethod
+    @torch.no_grad()
     def adjust_for_loss(bond_props, mm_mask, token_type_ids):
         bond_mask = token_type_ids == TokenType.BOND
         final_mask = bond_mask & mm_mask

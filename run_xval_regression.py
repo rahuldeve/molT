@@ -70,11 +70,11 @@ if __name__ == "__main__":
     model_config = MolTConfig()
     tokenizer = MolTTokenizer(model_config)
 
-    with wandb.init(project="molt") as run:
-        model_name = "model-molt_large:v0"
-        model_artifact = run.use_artifact(model_name)
-        model_dir = model_artifact.download()
+    api = wandb.Api()
+    artifact = api.artifact("rahul-e-dev/molt/model-molt_large:v0")
+    artifact.download()
 
+    model_dir = "artifacts/model-molt_large-v0"
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (

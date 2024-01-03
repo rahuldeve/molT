@@ -5,6 +5,7 @@ from sklearn import metrics
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
+import wandb
 from data import generate_and_scale_mol_descriptors
 from molT import (
     DataCollatorForMaskedMolecularModeling,

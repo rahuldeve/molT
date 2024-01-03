@@ -41,7 +41,6 @@ class CLSTargetModellingHead(nn.Module):
         # we do this by zeroing out rmse error based on final_mask
         target_token_mask = token_type_ids == TokenType.TGT
         target_values = target_values[target_token_mask]
-        print(preds, target_values)
         loss = nn.functional.mse_loss(preds, target_values)
         return loss, preds
 

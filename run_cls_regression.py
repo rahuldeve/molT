@@ -69,7 +69,13 @@ def train_func(model, ds, data_collator):
 if __name__ == "__main__":
     model_config = MolTConfig()
     tokenizer = MolTTokenizer(model_config)
-    model = CLSRegression.from_pretrained("./saved/base_mmm", config=model_config)
+
+    api = wandb.Api()
+    artifact = api.artifact("rahul-e-dev/molt/model-molt_large:v0")
+    artifact.download()
+
+    model_dir = "artifacts/model-molt_large-v0"
+    model = CLSRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (
         load_dataset("sagawa/ZINC-canonicalized")["validation"]

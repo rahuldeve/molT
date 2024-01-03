@@ -129,7 +129,7 @@ class XValRegression(MolTPreTrainedModel):
             sequence_output, mol_features, mm_mask, token_type_ids
         )
 
-        target_loss, pred_target_values = self.target_head(
+        target_loss, pred_target_values, target_values = self.target_head(
             sequence_output, target_values, mm_mask, token_type_ids
         )
 

@@ -43,7 +43,7 @@ class CLSTargetModellingHead(nn.Module):
         target_token_mask = token_type_ids == TokenType.TGT
         target_values = target_values[target_token_mask]
         loss = nn.functional.mse_loss(preds, target_values)
-        return loss, preds
+        return loss, preds, target_values
 
 
 
@@ -119,7 +119,7 @@ class CLSRegression(MolTPreTrainedModel):
         )
 
         sequence_output = outputs[0]
-        target_loss, pred_target_values = self.target_head(
+        target_loss, pred_target_values, target_values = self.target_head(
             sequence_output, target_values, mm_mask, token_type_ids
         )
 

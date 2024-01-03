@@ -41,4 +41,4 @@ class TargetModellingHead(nn.Module):
         # zero out any token not in final_mask
         mse_error = mse_error.masked_fill(~final_mask, 0.0)
         loss = mse_error.mean(dim=0).sum()
-        return loss, preds.masked_fill(~target_token_mask, 0.0)
+        return loss, preds[target_token_mask], target_values[target_token_mask]

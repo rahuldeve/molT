@@ -14,7 +14,7 @@ from molT import (
 )
 from molT.regression import XValRegression
 
-# os.environ["WANDB_PROJECT"] = "molt_ablation"
+os.environ["WANDB_PROJECT"] = "molt_ablation"
 
 
 def tokenize(entry, tokenizer):
@@ -65,6 +65,15 @@ def train_func(model, ds, data_collator):
 
     trainer.train()
 
+def download_model_from_wandb(entity, project, run_name, alias):
+    artifact_str = f'{entity}/{project}/model-{run_name}:{alias}'
+    api = wandb.Api()
+    artifact = api.artifact(artifact_str)
+    artifact.download()
+
+    import sys
+    if sys.platform.startswith('linux')
+
 
 if __name__ == "__main__":
     model_config = MolTConfig()
@@ -74,7 +83,7 @@ if __name__ == "__main__":
     artifact = api.artifact("rahul-e-dev/molt/model-molt_large:v0")
     artifact.download()
 
-    model_dir = "artifacts/model-molt_large-v0"
+    model_dir = "artifacts/model-molt_large:v0"
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (

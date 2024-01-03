@@ -79,7 +79,7 @@ if __name__ == "__main__":
     model = CLSRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (
-        load_dataset("sagawa/ZINC-canonicalized")["validation"]
+        load_dataset("sagawa/ZINC-canonicalized")["train"]
         .select(range(100_000))
         .train_test_split(seed=42)
     )

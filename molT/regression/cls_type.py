@@ -15,6 +15,7 @@ logger = logging.get_logger(__name__)
 @dataclass
 class CLSRegressionOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
+    target_loss: Optional[torch.FloatTensor] = None
     pred_target_values: Optional[torch.FloatTensor] = None
     true_target_values: Optional[torch.FloatTensor] = None
 
@@ -124,6 +125,7 @@ class CLSRegression(MolTPreTrainedModel):
 
         return CLSRegressionOutput(
             loss=target_loss,
+            target_loss=target_loss,
             pred_target_values=pred_target_values,
             true_target_values=target_values,  # type: ignore
         )

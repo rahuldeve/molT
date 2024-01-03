@@ -1,7 +1,7 @@
 import os
 from functools import partial
+
 from datasets import load_dataset
-from sklearn import metrics
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
@@ -10,10 +10,8 @@ from data import generate_and_scale_mol_descriptors
 from molT import (
     DataCollatorForMaskedMolecularModeling,
     MolTConfig,
-    MolTForMaskedMM,
     MolTTokenizer,
 )
-
 from molT.regression import XValRegression
 
 # os.environ["WANDB_PROJECT"] = "molt_ablation"
@@ -35,7 +33,7 @@ def train_func(model, ds, data_collator):
     training_args = TrainingArguments(
         output_dir="molT_runs",
         evaluation_strategy="steps",
-        learning_rate=2e-4,
+        learning_rate=1e-4,
         num_train_epochs=4,
         weight_decay=0.01,
         push_to_hub=False,
@@ -51,9 +49,9 @@ def train_func(model, ds, data_collator):
         data_seed=42,
         run_name="molt_xval",
         dataloader_pin_memory=True,
-        dataloader_drop_last=True
-        # bf16=True,
-        # bf16_full_eval=True,
+        dataloader_drop_last=True,
+        bf16=True,
+        bf16_full_eval=True,
     )
 
     trainer = Trainer(
@@ -80,7 +78,7 @@ if __name__ == "__main__":
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (
-        load_dataset("sagawa/ZINC-canonicalized")["validation"]
+        load_dataset("sagawa/ZINC-canonicalized")["train"]
         .select(range(100_000))
         .train_test_split(seed=42)
     )

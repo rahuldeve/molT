@@ -5,6 +5,7 @@ from sklearn import metrics
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
+import wandb
 from data import generate_and_scale_mol_descriptors
 from molT import (
     DataCollatorForMaskedMolecularModeling,
@@ -15,7 +16,7 @@ from molT import (
 
 from molT.regression import XValRegression
 
-os.environ["WANDB_PROJECT"] = "molt_ablation"
+# os.environ["WANDB_PROJECT"] = "molt_ablation"
 
 
 def tokenize(entry, tokenizer):
@@ -70,7 +71,13 @@ def train_func(model, ds, data_collator):
 if __name__ == "__main__":
     model_config = MolTConfig()
     tokenizer = MolTTokenizer(model_config)
-    model = XValRegression.from_pretrained("./saved/base_mmm", config=model_config)
+
+    with wandb.init(project="molt") as run:
+        model_name = "model-molt_large:v0"
+        model_artifact = run.use_artifact(model_name)
+        model_dir = model_artifact.download()
+
+    model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (
         load_dataset("sagawa/ZINC-canonicalized")["validation"]

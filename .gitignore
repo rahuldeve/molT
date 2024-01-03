@@ -162,3 +162,4 @@ cython_debug/
 molT_runs/
 wandb/
 saved/
+artifacts/

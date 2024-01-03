@@ -35,7 +35,7 @@ def train_func(model, ds, data_collator):
     training_args = TrainingArguments(
         output_dir="molT_runs",
         evaluation_strategy="steps",
-        learning_rate=2e-4,
+        learning_rate=1e-4,
         num_train_epochs=4,
         weight_decay=0.01,
         push_to_hub=False,
@@ -51,8 +51,8 @@ def train_func(model, ds, data_collator):
         data_seed=42,
         run_name="molt_cls",
         dataloader_pin_memory=True,
-        # bf16=True,
-        # bf16_full_eval=True,
+        bf16=True,
+        bf16_full_eval=True,
     )
 
     trainer = Trainer(
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     artifact = api.artifact("rahul-e-dev/molt/model-molt_large:v0")
     artifact.download()
 
-    model_dir = "artifacts/model-molt_large-v0"
+    model_dir = "artifacts/model-molt_large:v0"
     model = CLSRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (

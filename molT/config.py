@@ -15,9 +15,22 @@ descriptors = [
     "NumRadicalElectrons",
     "MaxPartialCharge",
     "MinPartialCharge",
+    "FpDensityMorgan1",
+    "FpDensityMorgan2",
+    "FpDensityMorgan3",
     "AvgIpc",
     "BalabanJ",
     "BertzCT",
+    "BCUT2D_MWHI",
+    "BCUT2D_MWLOW",
+    "BCUT2D_CHGHI",
+    "BCUT2D_CHGLO",
+    "BCUT2D_LOGPHI",
+    "BCUT2D_LOGPLOW",
+    "BCUT2D_MRHI",
+    "BCUT2D_MRLOW",
+    "MolLogP",
+    "MolMR",
 ]
 
 

@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     tokenizer.pad_token = tokenizer.eos_token
     data_collator = DataCollatorForMaskedMolecularModeling(
-        tokenizer=tokenizer, mlm_probability=model_config.mlm_probability
+        tokenizer=tokenizer, config=model_config
     )
 
     train_func(model, ds, data_collator)

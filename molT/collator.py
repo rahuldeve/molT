@@ -5,13 +5,16 @@ import torch
 from transformers.data.data_collator import DataCollatorMixin
 from transformers.tokenization_utils import PreTrainedTokenizerBase
 
-from molT.utils import TokenType
+from .utils import TokenType
+from .config import MolTConfig
 
 
 def torch_mask_atoms_bonds(
-    input_ids, token_ids, atom_mask, bond_mask, mlm_probability
+    input_ids, token_ids, atom_mask, bond_mask, atom_bond_mask_probability
 ):
-    probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
+    probability_matrix = torch.full_like(
+        input_ids, atom_bond_mask_probability, dtype=torch.float
+    )
     probability_matrix.masked_fill_(~atom_mask, value=0.0)
     masked_atom_tokens = torch.bernoulli(probability_matrix).bool()
 
@@ -40,15 +43,19 @@ def torch_mask_atoms_bonds(
     return masked_tokens
 
 
-def torch_mask_mol_features(input_ids, mol_feature_mask, mlm_probability):
-    probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
+def torch_mask_mol_features(input_ids, mol_feature_mask, mol_feature_mask_probability):
+    probability_matrix = torch.full_like(
+        input_ids, mol_feature_mask_probability, dtype=torch.float
+    )
     probability_matrix.masked_fill_(~mol_feature_mask, value=0.0)
     masked_feature_tokens = torch.bernoulli(probability_matrix).bool()
     return masked_feature_tokens
 
 
-def torch_mask_target(input_ids, target_mask, mlm_probability):
-    probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
+def torch_mask_target(input_ids, target_mask, target_mask_probability):
+    probability_matrix = torch.full_like(
+        input_ids, target_mask_probability, dtype=torch.float
+    )
     probability_matrix.masked_fill_(~target_mask, value=0.0)
     masked_target_tokens = torch.bernoulli(probability_matrix).bool()
     return masked_target_tokens
@@ -57,7 +64,7 @@ def torch_mask_target(input_ids, target_mask, mlm_probability):
 @dataclass
 class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
     tokenizer: PreTrainedTokenizerBase
-    mlm_probability: float = 0.15
+    config: MolTConfig
     pad_to_multiple_of: Optional[int] = None
     tf_experimental_compile: bool = False
     return_tensors: str = "pt"
@@ -79,19 +86,23 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         atom_mask = token_type_ids == TokenType.ATOM
         bond_mask = token_type_ids == TokenType.BOND
         masked_atom_bond_tokens = torch_mask_atoms_bonds(
-            input_ids, token_ids, atom_mask, bond_mask, self.mlm_probability
+            input_ids,
+            token_ids,
+            atom_mask,
+            bond_mask,
+            self.config.atom_bond_mask_probability,
         )
 
         # mask mol descriptor tokens
         mol_feature_mask = token_type_ids == TokenType.FEAT
         masked_mol_feature_tokens = torch_mask_mol_features(
-            input_ids, mol_feature_mask, self.mlm_probability
+            input_ids, mol_feature_mask, self.config.molecule_feature_mask_probability
         )
 
         # mask target tokens
         target_mask = token_type_ids == TokenType.TGT
         masked_target_tokens = torch_mask_target(
-            input_ids, target_mask, self.mlm_probability
+            input_ids, target_mask, self.config.target_mask_probability
         )
 
         # We will use the typical mlm type masking/randomization for input_ids of atoms and bonds
@@ -133,9 +144,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         batch["input_ids"] = input_ids
         batch["labels"] = labels
         batch["mm_mask"] = (
-            masked_atom_bond_tokens
-            | masked_mol_feature_tokens
-            | masked_target_tokens
+            masked_atom_bond_tokens | masked_mol_feature_tokens | masked_target_tokens
         )
         return batch
 
@@ -144,7 +153,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
     ) -> Dict[str, Any]:
         # Handle dict or lists with proper padding and conversion to tensor.
         batch = self.tokenizer.pad(
-            examples, # type: ignore
+            examples,  # type: ignore
             return_tensors="pt",
             pad_to_multiple_of=self.pad_to_multiple_of,
         )

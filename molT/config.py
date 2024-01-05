@@ -41,7 +41,9 @@ class MolTConfig(PretrainedConfig):
         position_embedding_type="absolute",
         use_cache=True,
         classifier_dropout=None,
-        mlm_probability=0.15,
+        atom_bond_mask_probability=0.15,
+        molecule_feature_mask_probability=0.15,
+        target_mask_probability=0.8,
         target_col_name="qed",
         **kwargs,
     ):
@@ -81,6 +83,8 @@ class MolTConfig(PretrainedConfig):
         self.position_embedding_type = position_embedding_type
         self.use_cache = use_cache
         self.classifier_dropout = classifier_dropout
-        self.mlm_probability = mlm_probability
+        self.atom_bond_mask_probability = atom_bond_mask_probability
+        self.molecule_feature_mask_probability = molecule_feature_mask_probability
+        self.target_mask_probability = target_mask_probability
         self.target_col_name = target_col_name
         self.feature_names = list(set(descriptors) - set([target_col_name]))

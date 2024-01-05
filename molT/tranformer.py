@@ -66,7 +66,7 @@ class MolTModel(MolTPreTrainedModel):
         self,
         input_ids: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        pos_embed_idxs: Optional[torch.Tensor] = None,
+        pos_embed_ids: Optional[torch.Tensor] = None,
         lp_embeds: Optional[torch.Tensor] = None,
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
@@ -193,7 +193,7 @@ class MolTModel(MolTPreTrainedModel):
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
-            pos_embed_idxs=pos_embed_idxs,
+            pos_embed_ids=pos_embed_ids,
             lp_embeds=lp_embeds,
             position_ids=position_ids,
             token_type_ids=token_type_ids,

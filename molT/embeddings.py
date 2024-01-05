@@ -130,9 +130,9 @@ class PositionEmbedder(nn.Module):
         self.vectorized_batch_select = torch.vmap(batched_select)
 
     @torch.no_grad()
-    def forward(self, pos_embed_idxs, lp_embeds, token_type_ids):
+    def forward(self, pos_embed_ids, lp_embeds, token_type_ids):
         B, L = token_type_ids.shape
-        pos_embed_idxs = pos_embed_idxs.reshape((B, L, -1)).long()
+        pos_embed_ids = pos_embed_ids.reshape((B, L, -1)).long()
         lp_embeds = lp_embeds.reshape((B, L, -1))
 
         if self.training:
@@ -141,7 +141,7 @@ class PositionEmbedder(nn.Module):
             ).unsqueeze(-1)
             lp_embeds = lp_embeds * random_signs
 
-        pos_embeds = self.vectorized_batch_select(pos_embed_idxs, lp_embeds)
+        pos_embeds = self.vectorized_batch_select(pos_embed_ids, lp_embeds)
         pos_embeds = pos_embeds.flatten(-2, -1)
 
         atom_mask = token_type_ids == TokenType.ATOM
@@ -173,7 +173,7 @@ class MolTEmbeddings(nn.Module):
         self,
         input_ids,
         token_type_ids,
-        pos_embed_idxs,
+        pos_embed_ids,
         lp_embeds,
         atom_props,
         bond_props,
@@ -181,7 +181,7 @@ class MolTEmbeddings(nn.Module):
         target_values,
         **kwargs,
     ):
-        pos_embeds = self.pos_embeddings(pos_embed_idxs, lp_embeds, token_type_ids)
+        pos_embeds = self.pos_embeddings(pos_embed_ids, lp_embeds, token_type_ids)
         token_type_embeds = self.type_embeddings(token_type_ids)
         input_embeddings = self.embeddings(input_ids)
 

@@ -9,7 +9,7 @@ from molT.utils import TokenType
 
 
 def torch_mask_atoms_bonds(
-    input_ids, token_idxs, atom_mask, bond_mask, mlm_probability
+    input_ids, token_ids, atom_mask, bond_mask, mlm_probability
 ):
     probability_matrix = torch.full_like(input_ids, mlm_probability, dtype=torch.float)
     probability_matrix.masked_fill_(~atom_mask, value=0.0)
@@ -17,14 +17,14 @@ def torch_mask_atoms_bonds(
 
     # Not sure how to vectorize the loop
     for batch_idx in range(masked_atom_tokens.shape[0]):
-        batch_token_idxs = token_idxs[batch_idx]
+        batch_token_ids = token_ids[batch_idx]
         batch_masked_atom_tokens = masked_atom_tokens[batch_idx]
         batch_atom_mask = atom_mask[batch_idx]
 
         # Do a comparison and mark duplicates
-        initial_masked_atom_token_idsx = batch_token_idxs[batch_masked_atom_tokens]
+        initial_masked_atom_token_idsx = batch_token_ids[batch_masked_atom_tokens]
         same_atom_idx_mask = (
-            initial_masked_atom_token_idsx.unsqueeze(-1) == batch_token_idxs
+            initial_masked_atom_token_idsx.unsqueeze(-1) == batch_token_ids
         ).any(dim=0)
 
         # above tensor may be marking bonds as duplicates; enforce atom mask to remove them
@@ -70,7 +70,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
             )
 
     def torch_mask_tokens(self, batch):
-        token_idxs = batch["token_idxs"]
+        token_ids = batch["token_ids"]
         input_ids = batch["input_ids"]
         token_type_ids = batch["token_type_ids"]
         labels = input_ids.clone()
@@ -79,7 +79,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         atom_mask = token_type_ids == TokenType.ATOM
         bond_mask = token_type_ids == TokenType.BOND
         masked_atom_bond_tokens = torch_mask_atoms_bonds(
-            input_ids, token_idxs, atom_mask, bond_mask, self.mlm_probability
+            input_ids, token_ids, atom_mask, bond_mask, self.mlm_probability
         )
 
         # mask mol descriptor tokens

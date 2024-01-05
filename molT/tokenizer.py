@@ -99,10 +99,10 @@ def get_bond_properties(mol):
 
 
 # Test this function
-def generate_tokens_atom_bond_mask_pos_embed_idxs(edge_list):
+def generate_tokens_atom_bond_mask_pos_embed_ids(edge_list):
     tokens = []
     atom_mask = []
-    pos_embed_idxs = []
+    pos_embed_ids = []
     atoms_seen = set()
     for bond_idx in range(edge_list.shape[0]):
         st_atom_idx = edge_list[bond_idx, 0]
@@ -111,24 +111,24 @@ def generate_tokens_atom_bond_mask_pos_embed_idxs(edge_list):
         if st_atom_idx not in atoms_seen:
             tokens.append(st_atom_idx)
             atom_mask.append(True)
-            pos_embed_idxs.append([st_atom_idx, st_atom_idx])
+            pos_embed_ids.append([st_atom_idx, st_atom_idx])
             atoms_seen.add(st_atom_idx)
 
         tokens.append(bond_idx)
         atom_mask.append(False)
-        pos_embed_idxs.append([st_atom_idx, en_atom_idx])
+        pos_embed_ids.append([st_atom_idx, en_atom_idx])
 
         if en_atom_idx not in atoms_seen:
             tokens.append(en_atom_idx)
             atom_mask.append(True)
             atoms_seen.add(en_atom_idx)
-            pos_embed_idxs.append([en_atom_idx, en_atom_idx])
+            pos_embed_ids.append([en_atom_idx, en_atom_idx])
 
     tokens = np.array(tokens, dtype=np.uint)
     atom_mask = np.array(atom_mask, dtype=bool)
     bond_mask = ~atom_mask
-    pos_embed_idxs = np.stack(pos_embed_idxs, axis=0)
-    return tokens, atom_mask, bond_mask, pos_embed_idxs
+    pos_embed_ids = np.stack(pos_embed_ids, axis=0)
+    return tokens, atom_mask, bond_mask, pos_embed_ids
 
 
 class MolTTokenizer(PreTrainedTokenizerBase):
@@ -136,10 +136,10 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         "input_ids",
         "attention_mask",
         "token_type_ids",
-        "pos_embed_idxs",
+        "pos_embed_ids",
         "lp_embeds",
         "labels",
-        "token_idxs",
+        "token_ids",
         "mol_features",
         "atom_props",
         "bond_props",
@@ -279,23 +279,23 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         bonds, edge_list, bond_props = get_bond_properties(mol)
 
         (
-            token_idxs,
+            token_ids,
             atom_mask,
             bond_mask,
-            pos_embed_idxs,
-        ) = generate_tokens_atom_bond_mask_pos_embed_idxs(edge_list)
+            pos_embed_ids,
+        ) = generate_tokens_atom_bond_mask_pos_embed_ids(edge_list)
 
         assert set(chain.from_iterable(edge_list.tolist())) == set(
-            token_idxs[atom_mask].tolist()
+            token_ids[atom_mask].tolist()
         )
 
         # convert the tokens idxs to match token_mapping dictionary
-        input_ids = np.zeros_like(token_idxs, dtype=np.uint)
+        input_ids = np.zeros_like(token_ids, dtype=np.uint)
         input_ids[atom_mask] = np.array(
-            [self.encoder[atoms[x]] for x in token_idxs[atom_mask]]
+            [self.encoder[atoms[x]] for x in token_ids[atom_mask]]
         )
         input_ids[bond_mask] = np.array(
-            [self.encoder[bonds[x]] for x in token_idxs[bond_mask]]
+            [self.encoder[bonds[x]] for x in token_ids[bond_mask]]
         )
 
         # padding lp_embeds to match shape of input_ids
@@ -303,17 +303,17 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         npad = input_ids.shape[0] - lp_embeds.shape[0]
         lp_embeds = np.pad(lp_embeds, ((0, npad), (0, 0)), constant_values=0.0)
 
-        def adjust_properties(props, token_idxs, mask):
+        def adjust_properties(props, token_ids, mask):
             adjusted_props = dict()
             for k, v in props.items():
-                adjusted_v = np.zeros(shape=token_idxs.shape, dtype=v.dtype)
-                adjusted_v[mask] = np.array([v[x] for x in token_idxs[mask]])
+                adjusted_v = np.zeros(shape=token_ids.shape, dtype=v.dtype)
+                adjusted_v[mask] = np.array([v[x] for x in token_ids[mask]])
                 adjusted_props[k] = adjusted_v
 
             return adjusted_props
 
-        atom_props = adjust_properties(atom_props, token_idxs, atom_mask)
-        bond_props = adjust_properties(bond_props, token_idxs, bond_mask)
+        atom_props = adjust_properties(atom_props, token_ids, atom_mask)
+        bond_props = adjust_properties(bond_props, token_ids, bond_mask)
 
         atom_props = pack_atom_properties(**atom_props)
         bond_props = pack_bond_properties(**bond_props)
@@ -336,9 +336,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             token_type_ids, (0, n_mol_feats), constant_values=TokenType.FEAT.value
         )
 
-        tokens = np.pad(token_idxs, (0, n_mol_feats), constant_values=0)
-        pos_embed_idxs = np.pad(
-            pos_embed_idxs, ((0, n_mol_feats), (0, 0)), constant_values=0
+        tokens = np.pad(token_ids, (0, n_mol_feats), constant_values=0)
+        pos_embed_ids = np.pad(
+            pos_embed_ids, ((0, n_mol_feats), (0, 0)), constant_values=0
         )  # type: ignore
         lp_embeds = np.pad(lp_embeds, ((0, n_mol_feats), (0, 0)), constant_values=0)
         atom_props = np.pad(atom_props, ((0, 0), (0, n_mol_feats)), constant_values=0)  # type: ignore
@@ -357,7 +357,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         )
 
         tokens = np.pad(tokens, (0, 1), constant_values=0)
-        pos_embed_idxs = np.pad(pos_embed_idxs, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
+        pos_embed_ids = np.pad(pos_embed_ids, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
         lp_embeds = np.pad(lp_embeds, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
         atom_props = np.pad(atom_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
         bond_props = np.pad(bond_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
@@ -366,9 +366,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         # convert to lists for easier processing later
         # flattening pos_embeds for compatiability with BatchEncoding and DataCollator
         # maybe do list conversion after special_tokens?
-        token_idxs = tokens.astype(int).tolist()
+        token_ids = tokens.astype(int).tolist()
         input_ids = input_ids.astype(int).tolist()
-        pos_embed_idxs = pos_embed_idxs.flatten().tolist()
+        pos_embed_ids = pos_embed_ids.flatten().tolist()
         lp_embeds = lp_embeds.flatten().tolist()
         token_type_ids = token_type_ids.astype(int).tolist()
         atom_props = atom_props.tolist()
@@ -377,9 +377,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         target_values = target_values.tolist()
 
         encoded_inputs = {
-            "token_idxs": token_idxs,
+            "token_ids": token_ids,
             "input_ids": input_ids,
-            "pos_embed_idxs": pos_embed_idxs,
+            "pos_embed_ids": pos_embed_ids,
             "lp_embeds": lp_embeds,
             "token_type_ids": token_type_ids,
             "atom_props": atom_props,
@@ -396,8 +396,8 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             encoded_inputs["input_ids"].insert(0, self.cls_token_id)
             encoded_inputs["input_ids"].append(self.eos_token_id)
 
-            encoded_inputs["token_idxs"].insert(0, 0)
-            encoded_inputs["token_idxs"].append(0)
+            encoded_inputs["token_ids"].insert(0, 0)
+            encoded_inputs["token_ids"].append(0)
 
             encoded_inputs["token_type_ids"].insert(0, TokenType.SPECIAL)
             encoded_inputs["token_type_ids"].append(TokenType.SPECIAL)
@@ -416,12 +416,12 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             encoded_inputs["target_values"].insert(0, 0.0)
             encoded_inputs["target_values"].append(0.0)
 
-            encoded_inputs["pos_embed_idxs"] = (
-                [0.0] * 2 + encoded_inputs["pos_embed_idxs"] + [0.0] * 2
+            encoded_inputs["pos_embed_ids"] = (
+                [0.0] * 2 + encoded_inputs["pos_embed_ids"] + [0.0] * 2
             )
 
             # We are not padding from the left. If we did, there would be a mismatch
-            # between indexes of lp_embeds and indexes inside pos_embed_idxs; the token
+            # between indexes of lp_embeds and indexes inside pos_embed_ids; the token
             # with index 0 would have the lp_embeds assigned as 0.0
             encoded_inputs["lp_embeds"] = (
                 encoded_inputs["lp_embeds"]
@@ -560,9 +560,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             padding_funcs = {
                 "input_ids": lambda x: x + [self.pad_token_id] * difference,
                 "attention_mask": lambda x: x + [0] * difference,
-                "token_idxs": lambda x: x + [0] * difference,
+                "token_ids": lambda x: x + [0] * difference,
                 "token_type_ids": lambda x: x + [TokenType.SPECIAL] * difference,
-                "pos_embed_idxs": lambda x: x + [0.0] * (2 * difference),
+                "pos_embed_ids": lambda x: x + [0.0] * (2 * difference),
                 "lp_embeds": lambda x: x
                 + [0.0] * (self.laplace_embedding_dim * difference),
                 "atom_props": lambda x: [entry + [0] * difference for entry in x],

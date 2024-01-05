@@ -42,10 +42,9 @@ class CLSRegression(MolTPreTrainedModel):
         self,
         input_ids: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        pos_embed_idxs: Optional[torch.Tensor] = None,
+        pos_embed_ids: Optional[torch.Tensor] = None,
         lp_embeds: Optional[torch.Tensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
-        token_idxs: Optional[torch.Tensor] = None,
         mm_mask: Optional[torch.Tensor] = None,
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
@@ -59,7 +58,9 @@ class CLSRegression(MolTPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        **kwargs
+        # the following args are not needed but huggingface tokenizer
+        # will not send them to the collator if its not specified here
+        token_ids: Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], CLSRegressionOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -76,7 +77,7 @@ class CLSRegression(MolTPreTrainedModel):
         outputs = self.graph_transformer(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            pos_embed_idxs=pos_embed_idxs,
+            pos_embed_ids=pos_embed_ids,
             lp_embeds=lp_embeds,
             token_type_ids=token_type_ids,
             position_ids=position_ids,

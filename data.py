@@ -43,8 +43,8 @@ def generate_and_scale_mol_descriptors(
     )
 
     np.random.seed(42)
-    rand_idxs = np.random.randint(0, len(ds["train"]), num_samples)
-    random_samples = ds["train"].select(rand_idxs).select_columns(descriptor_names)
+    rand_ids = np.random.randint(0, len(ds["train"]), num_samples)
+    random_samples = ds["train"].select(rand_ids).select_columns(descriptor_names)
     random_samples = random_samples.to_pandas()
 
     scaler = StandardScaler().set_output(transform="pandas")

@@ -5,7 +5,6 @@ from datasets import load_dataset
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
-import wandb
 from data import generate_and_scale_mol_descriptors
 from molT import (
     DataCollatorForMaskedMolecularModeling,
@@ -13,6 +12,7 @@ from molT import (
     MolTTokenizer,
 )
 from molT.regression import XValRegression
+from utils import download_model_from_wandb
 
 os.environ["WANDB_PROJECT"] = "molt_ablation"
 
@@ -65,25 +65,12 @@ def train_func(model, ds, data_collator):
 
     trainer.train()
 
-def download_model_from_wandb(entity, project, run_name, alias):
-    artifact_str = f'{entity}/{project}/model-{run_name}:{alias}'
-    api = wandb.Api()
-    artifact = api.artifact(artifact_str)
-    artifact.download()
-
-    import sys
-    if sys.platform.startswith('linux')
-
 
 if __name__ == "__main__":
     model_config = MolTConfig()
     tokenizer = MolTTokenizer(model_config)
 
-    api = wandb.Api()
-    artifact = api.artifact("rahul-e-dev/molt/model-molt_large:v0")
-    artifact.download()
-
-    model_dir = "artifacts/model-molt_large:v0"
+    model_dir = download_model_from_wandb("rahul-dev-e", "molt", "molt_large", "v0")
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = (

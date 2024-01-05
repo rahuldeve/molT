@@ -98,15 +98,6 @@ def get_bond_properties(mol):
     return bonds, edge_list, properties
 
 
-# def generate_pos_embeddings(tokens, lp_embeds, edge_list, atom_mask, bond_mask):
-#     pos_embeds = np.zeros((tokens.shape[0], 2 * lp_embeds.shape[-1]))
-#     pos_embeds[bond_mask, :] = lp_embeds[edge_list].reshape((edge_list.shape[0], -1))
-#     pos_embeds[atom_mask, :] = lp_embeds[
-#         np.repeat(tokens[atom_mask][:, None], 2, axis=-1)
-#     ].reshape((edge_list.shape[0], -1))
-#     return pos_embeds
-
-
 # Test this function
 def generate_tokens_atom_bond_mask_pos_embed_idxs(edge_list):
     tokens = []
@@ -346,7 +337,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         )
 
         tokens = np.pad(token_idxs, (0, n_mol_feats), constant_values=0)
-        pos_embed_idxs = np.pad(pos_embed_idxs, ((0, n_mol_feats), (0, 0)), constant_values=0)  # type: ignore
+        pos_embed_idxs = np.pad(
+            pos_embed_idxs, ((0, n_mol_feats), (0, 0)), constant_values=0
+        )  # type: ignore
         lp_embeds = np.pad(lp_embeds, ((0, n_mol_feats), (0, 0)), constant_values=0)
         atom_props = np.pad(atom_props, ((0, 0), (0, n_mol_feats)), constant_values=0)  # type: ignore
         bond_props = np.pad(bond_props, ((0, 0), (0, n_mol_feats)), constant_values=0)  # type: ignore
@@ -424,9 +417,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             encoded_inputs["target_values"].append(0.0)
 
             encoded_inputs["pos_embed_idxs"] = (
-                [0.0] * 2
-                + encoded_inputs["pos_embed_idxs"]
-                + [0.0] * 2
+                [0.0] * 2 + encoded_inputs["pos_embed_idxs"] + [0.0] * 2
             )
 
             # We are not padding from the left. If we did, there would be a mismatch
@@ -539,6 +530,9 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         if return_attention_mask is None:
             return_attention_mask = "attention_mask" in self.model_input_names
 
+        if self.padding_side == "left":
+            raise ValueError("Padding is supported only on the right side")
+
         input_length = len(encoded_inputs[self.model_input_names[0]])  # type: ignore
 
         if padding_strategy == PaddingStrategy.LONGEST:
@@ -562,96 +556,22 @@ class MolTTokenizer(PreTrainedTokenizerBase):
 
         if needs_to_be_padded and max_length is not None:
             difference = max_length - input_length
-            if self.padding_side == "left":
-                encoded_inputs["input_ids"] = [
-                    self.pad_token_id
-                ] * difference + encoded_inputs["input_ids"]  # type: ignore
 
-                if return_attention_mask:
-                    encoded_inputs["attention_mask"] = [
-                        0
-                    ] * difference + encoded_inputs["attention_mask"]  # type: ignore
+            padding_funcs = {
+                "input_ids": lambda x: x + [self.pad_token_id] * difference,
+                "attention_mask": lambda x: x + [0] * difference,
+                "token_idxs": lambda x: x + [0] * difference,
+                "token_type_ids": lambda x: x + [TokenType.SPECIAL] * difference,
+                "pos_embed_idxs": lambda x: x + [0.0] * (2 * difference),
+                "lp_embeds": lambda x: x
+                + [0.0] * (self.laplace_embedding_dim * difference),
+                "atom_props": lambda x: [entry + [0] * difference for entry in x],
+                "bond_props": lambda x: [entry + [0] * difference for entry in x],
+                "mol_features": lambda x: x + [0] * difference,
+                "target_values": lambda x: x + [0] * difference,
+            }
 
-                encoded_inputs["token_idxs"] = [0] * difference + encoded_inputs[
-                    "token_idxs"
-                ]  # type: ignore
-
-                encoded_inputs["token_type_ids"] = [
-                    TokenType.SPECIAL
-                ] * difference + encoded_inputs["token_type_ids"]  # type: ignore
-
-                encoded_inputs["pos_embed_idxs"] = [0.0] * (
-                    2 * self.laplace_embedding_dim * difference
-                ) + encoded_inputs["pos_embed_idxs"]  # type: ignore
-
-                encoded_inputs["lp_embeds"] = [0.0] * (
-                    self.laplace_embedding_dim * difference
-                ) + encoded_inputs["lp_embeds"]  # type: ignore
-
-                # n_atom_props = len(encoded_inputs["atom_props"])
-                encoded_inputs["atom_props"] = [
-                    [0] * difference + entry
-                    for entry in encoded_inputs["atom_props"]  # type: ignore
-                ]
-
-                encoded_inputs["bond_props"] = [
-                    [0] * difference + entry
-                    for entry in encoded_inputs["bond_props"]  # type: ignore
-                ]
-
-                encoded_inputs["mol_features"] = [0] * difference + encoded_inputs[
-                    "mol_features"
-                ]  # type: ignore
-
-                encoded_inputs["target_values"] = [0] * difference + encoded_inputs[
-                    "target_values"
-                ]  # type: ignore
-
-            elif self.padding_side == "right":
-                encoded_inputs["input_ids"] = (
-                    encoded_inputs["input_ids"] + [self.pad_token_id] * difference  # type: ignore
-                )
-
-                if return_attention_mask:
-                    encoded_inputs["attention_mask"] = (
-                        encoded_inputs["attention_mask"] + [0] * difference  # type: ignore
-                    )
-
-                encoded_inputs["token_idxs"] = (
-                    encoded_inputs["token_idxs"] + [0] * difference  # type: ignore
-                )
-
-                encoded_inputs["token_type_ids"] = (
-                    encoded_inputs["token_type_ids"] + [TokenType.SPECIAL] * difference  # type: ignore
-                )
-
-                encoded_inputs["pos_embed_idxs"] = encoded_inputs["pos_embed_idxs"] + [0.0] * (
-                    2 * difference
-                )  # type: ignore
-
-                encoded_inputs["lp_embeds"] = encoded_inputs["lp_embeds"] + [0.0] * (
-                    self.laplace_embedding_dim * difference
-                )  # type: ignore
-
-                encoded_inputs["atom_props"] = [
-                    entry + [0] * difference
-                    for entry in encoded_inputs["atom_props"]  # type: ignore
-                ]
-
-                encoded_inputs["bond_props"] = [
-                    entry + [0] * difference
-                    for entry in encoded_inputs["bond_props"]  # type: ignore
-                ]
-
-                encoded_inputs["mol_features"] = (
-                    encoded_inputs["mol_features"] + [0] * difference  # type: ignore
-                )
-
-                encoded_inputs["target_values"] = (
-                    encoded_inputs["target_values"] + [0] * difference  # type: ignore
-                )
-
-            else:
-                raise ValueError("Invalid padding strategy:" + str(self.padding_side))
+            for k in encoded_inputs.keys():
+                encoded_inputs[k] = padding_funcs[k](encoded_inputs[k])
 
         return encoded_inputs

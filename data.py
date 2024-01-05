@@ -1,7 +1,6 @@
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import rdkit.Chem as Chem
-from functools import partial
 
 
 def standardize(smiles):

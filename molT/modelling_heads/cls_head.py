@@ -1,20 +1,7 @@
-from dataclasses import dataclass
-from typing import Optional
-
-import torch
 import torch.nn as nn
-from transformers.utils import ModelOutput
 
 from ..utils import TokenType
-from .base import ModellingHead, ExpDive
-
-
-# @dataclass
-# class CLSRegressionOutput(ModelOutput):
-#     loss: Optional[torch.FloatTensor] = None
-#     target_loss: Optional[torch.FloatTensor] = None
-#     pred_target_values: Optional[torch.FloatTensor] = None
-#     true_target_values: Optional[torch.FloatTensor] = None
+from .base import ExpDive, ModellingHead
 
 
 class CLSTargetRegressionHead(nn.Module):

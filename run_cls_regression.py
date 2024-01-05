@@ -2,7 +2,6 @@ import os
 from functools import partial
 
 from datasets import load_dataset
-from sklearn import metrics
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
@@ -10,10 +9,9 @@ from data import generate_and_scale_mol_descriptors
 from molT import (
     DataCollatorForMaskedMolecularModeling,
     MolTConfig,
-    MolTForMaskedMM,
     MolTTokenizer,
 )
-from molT.regression import CLSRegression
+from molT import CLSRegression
 from utils import download_model_from_wandb
 
 os.environ["WANDB_PROJECT"] = "molt_ablation"

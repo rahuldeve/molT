@@ -1,12 +1,10 @@
 from typing import Optional, Tuple, Union
 from dataclasses import dataclass
 import torch
-import torch.nn as nn
 from transformers.utils import logging, ModelOutput
 from sklearn import metrics
 
 from ..tranformer import MolTModel, MolTPreTrainedModel
-from ..utils import TokenType
 from ..modelling_heads import CLSTargetRegressionHead
 
 

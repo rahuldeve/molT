@@ -10,8 +10,8 @@ from molT import (
     DataCollatorForMaskedMolecularModeling,
     MolTConfig,
     MolTTokenizer,
+    XValRegression,
 )
-from molT.regression import XValRegression
 from utils import download_model_from_wandb
 
 os.environ["WANDB_PROJECT"] = "molt_ablation"

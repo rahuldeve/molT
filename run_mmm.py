@@ -1,7 +1,7 @@
 import os
 from functools import partial
+
 from datasets import load_dataset
-from sklearn import metrics
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
@@ -53,7 +53,7 @@ def train_func(model, ds, data_collator):
         max_grad_norm=0.5,
         save_steps=128,
         save_strategy="steps",
-        load_best_model_at_end=True
+        load_best_model_at_end=True,
     )
 
     trainer = Trainer(
@@ -66,7 +66,6 @@ def train_func(model, ds, data_collator):
     )
 
     trainer.train()
-    trainer.save_model('./saved/base_mmm')
 
 
 if __name__ == "__main__":

@@ -2,18 +2,10 @@ import torch
 import torch.nn as nn
 
 from ..utils import TokenType
-from .base import ModellingHead
+from .base import ExpDive, ModellingHead
 
 
-class ExpDive(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(self, inp):
-        return torch.exp(inp) - torch.exp(-inp)
-
-
-class TargetModellingHead(nn.Module):
+class XValTargetRegressionHead(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
         self.projection = ModellingHead(1, config)

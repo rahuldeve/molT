@@ -1,22 +1,22 @@
-from typing import Optional, Tuple, Union
 from dataclasses import dataclass
+from typing import Optional, Tuple, Union
+
 import torch
-from transformers.utils import logging, ModelOutput
-from sklearn import metrics
+from transformers.utils import ModelOutput, logging
+
+from ..modelling_heads import (
+    AtomPropModellingHead,
+    BondPropModellingHead,
+    MolFeatureModellingHead,
+    TokenModellingHead,
+)
 from ..tranformer import MolTModel, MolTPreTrainedModel
-from ..utils import TokenType
-from ..masked_molecular_modelling.atom_props import AtomPropModellingHead
-from ..masked_molecular_modelling.base import MoleculeModellingOutput
-from ..masked_molecular_modelling.bond_props import BondPropModellingHead
-from ..masked_molecular_modelling.mlm import TokenModellingHead
-from ..masked_molecular_modelling.mol_features import MolFeatureModellingHead
-from ..masked_molecular_modelling.target import TargetModellingHead
 
 logger = logging.get_logger(__name__)
 
 
 @dataclass
-class XValRegressionOutput(ModelOutput):
+class MoleculeModellingOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
     molecule_modelling_loss: Optional[torch.FloatTensor] = None
     atom_prop_loss: Optional[torch.FloatTensor] = None
@@ -24,11 +24,12 @@ class XValRegressionOutput(ModelOutput):
     mol_feature_loss: Optional[torch.FloatTensor] = None
     target_loss: Optional[torch.FloatTensor] = None
 
+    target_mask: Optional[torch.FloatTensor] = None
     pred_target_values: Optional[torch.FloatTensor] = None
     true_target_values: Optional[torch.FloatTensor] = None
 
 
-class XValRegression(MolTPreTrainedModel):
+class MolTForMaskedMM(MolTPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
@@ -44,7 +45,7 @@ class XValRegression(MolTPreTrainedModel):
         self.atom_prop_head = AtomPropModellingHead(config)
         self.bond_prop_head = BondPropModellingHead(config)
         self.mol_feat_head = MolFeatureModellingHead(config)
-        self.target_head = TargetModellingHead(config)
+        self.target_head = TokenModellingHead(config)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -56,12 +57,10 @@ class XValRegression(MolTPreTrainedModel):
         pos_embed_idxs: Optional[torch.Tensor] = None,
         lp_embeds: Optional[torch.Tensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
-        token_idxs: Optional[torch.Tensor] = None,
         mm_mask: Optional[torch.Tensor] = None,
         atom_props: Optional[torch.Tensor] = None,
         bond_props: Optional[torch.Tensor] = None,
         mol_features: Optional[torch.Tensor] = None,
-        target_values: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -71,7 +70,8 @@ class XValRegression(MolTPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple[torch.Tensor], XValRegressionOutput]:
+        **kwargs,
+    ) -> Union[Tuple[torch.Tensor], MoleculeModellingOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
             Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -107,9 +107,6 @@ class XValRegression(MolTPreTrainedModel):
             mol_features=MolFeatureModellingHead.adjust_for_input(
                 mol_features, mm_mask, token_type_ids
             ),
-            target_values=TargetModellingHead.adjust_for_input(
-                target_values, mm_mask, token_type_ids, self.training
-            ),
         )
 
         sequence_output = outputs[0]
@@ -129,10 +126,6 @@ class XValRegression(MolTPreTrainedModel):
             sequence_output, mol_features, mm_mask, token_type_ids
         )
 
-        target_loss, pred_target_values, target_values = self.target_head(
-            sequence_output, target_values, mm_mask, token_type_ids
-        )
-
         loss = None
         if (
             molecule_modelling_loss is not None
@@ -145,20 +138,16 @@ class XValRegression(MolTPreTrainedModel):
                 + atom_prop_loss
                 + bond_prop_loss
                 + mol_feature_loss
-                + target_loss
             )
 
-        return XValRegressionOutput(
+        return MoleculeModellingOutput(
             loss=loss,
             molecule_modelling_loss=molecule_modelling_loss,
             atom_prop_loss=atom_prop_loss,
             bond_prop_loss=bond_prop_loss,
             mol_feature_loss=mol_feature_loss,
-            target_loss=target_loss,
-            pred_target_values=pred_target_values,
-            true_target_values=target_values,  # type: ignore
         )
-    
+
     @staticmethod
     def report_metrics(eval_results):
         (
@@ -166,25 +155,11 @@ class XValRegression(MolTPreTrainedModel):
             atom_prop_loss,
             bond_prop_loss,
             mol_feature_loss,
-            target_loss,
-            pred_target_values,
-            true_target_values,
         ) = eval_results.predictions
-
-        y_true = true_target_values
-        y_pred = pred_target_values
-
-        r2_score = metrics.r2_score(y_true, y_pred)
-        mae = metrics.mean_absolute_error(y_true, y_pred)
-        mse = metrics.mean_squared_error(y_true, y_pred)
 
         return {
             "mm_loss": mm_loss.mean(),
             "atom_prop_loss": atom_prop_loss.mean(),
             "bond_prop_loss": bond_prop_loss.mean(),
             "mol_feature_loss": mol_feature_loss.mean(),
-            "target_loss": target_loss.mean(),
-            "target_r2": r2_score,
-            "target_mae": mae,
-            "target_mse": mse,
         }

@@ -1,53 +1,36 @@
-from typing import Optional, Tuple, Union
 from dataclasses import dataclass
+from typing import Optional, Tuple, Union
+
 import torch
-import torch.nn as nn
-from transformers.utils import logging, ModelOutput
 from sklearn import metrics
+from transformers.utils import ModelOutput, logging
 
+from ..modelling_heads import (
+    AtomPropModellingHead,
+    BondPropModellingHead,
+    MolFeatureModellingHead,
+    TokenModellingHead,
+    XValTargetRegressionHead,
+)
 from ..tranformer import MolTModel, MolTPreTrainedModel
-from ..utils import TokenType
-from ..masked_molecular_modelling.base import ModellingHead
-
 
 logger = logging.get_logger(__name__)
 
+
 @dataclass
-class CLSRegressionOutput(ModelOutput):
+class XValRegressionOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
+    molecule_modelling_loss: Optional[torch.FloatTensor] = None
+    atom_prop_loss: Optional[torch.FloatTensor] = None
+    bond_prop_loss: Optional[torch.FloatTensor] = None
+    mol_feature_loss: Optional[torch.FloatTensor] = None
     target_loss: Optional[torch.FloatTensor] = None
+
     pred_target_values: Optional[torch.FloatTensor] = None
     true_target_values: Optional[torch.FloatTensor] = None
 
 
-class ExpDive(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(self, inp):
-        return torch.exp(inp) - torch.exp(-inp)
-
-
-class CLSTargetModellingHead(nn.Module):
-    def __init__(self, config) -> None:
-        super().__init__()
-        self.projection = ModellingHead(1, config)
-        self.exp_dive = ExpDive()
-
-    def forward(self, features, target_values, mm_mask, token_type_ids):
-        preds = self.projection(features[:, 0, :])
-        preds = self.exp_dive(preds).squeeze()
-
-        # calculate loss only for tokens that are mol descriptors and have been masked
-        # we do this by zeroing out rmse error based on final_mask
-        target_token_mask = token_type_ids == TokenType.TGT
-        target_values = target_values[target_token_mask]
-        loss = nn.functional.mse_loss(preds, target_values)
-        return loss, preds, target_values
-
-
-
-class CLSRegression(MolTPreTrainedModel):
+class XValRegression(MolTPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
@@ -59,7 +42,11 @@ class CLSRegression(MolTPreTrainedModel):
             )
 
         self.graph_transformer = MolTModel(config, add_pooling_layer=False)
-        self.target_head = CLSTargetModellingHead(config)
+        self.token_head = TokenModellingHead(config)
+        self.atom_prop_head = AtomPropModellingHead(config)
+        self.bond_prop_head = BondPropModellingHead(config)
+        self.mol_feat_head = MolFeatureModellingHead(config)
+        self.target_head = XValTargetRegressionHead(config)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -86,7 +73,7 @@ class CLSRegression(MolTPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple[torch.Tensor], CLSRegressionOutput]:
+    ) -> Union[Tuple[torch.Tensor], XValRegressionOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
             Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -113,39 +100,91 @@ class CLSRegression(MolTPreTrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            atom_props=atom_props,
-            bond_props=bond_props,
-            mol_features=mol_features,
+            atom_props=AtomPropModellingHead.adjust_for_input(
+                atom_props, mm_mask, token_type_ids
+            ),
+            bond_props=BondPropModellingHead.adjust_for_input(
+                bond_props, mm_mask, token_type_ids
+            ),
+            mol_features=MolFeatureModellingHead.adjust_for_input(
+                mol_features, mm_mask, token_type_ids
+            ),
+            target_values=XValTargetRegressionHead.adjust_for_input(
+                target_values, mm_mask, token_type_ids, self.training
+            ),
         )
 
         sequence_output = outputs[0]
+        molecule_modelling_loss, _ = self.token_head(
+            sequence_output, labels, mm_mask, token_type_ids
+        )
+
+        atom_prop_loss, _ = self.atom_prop_head(
+            sequence_output, atom_props, mm_mask, token_type_ids
+        )
+
+        bond_prop_loss, _ = self.bond_prop_head(
+            sequence_output, bond_props, mm_mask, token_type_ids
+        )
+
+        mol_feature_loss, _ = self.mol_feat_head(
+            sequence_output, mol_features, mm_mask, token_type_ids
+        )
+
         target_loss, pred_target_values, target_values = self.target_head(
             sequence_output, target_values, mm_mask, token_type_ids
         )
 
-        return CLSRegressionOutput(
-            loss=target_loss,
+        loss = None
+        if (
+            molecule_modelling_loss is not None
+            and atom_prop_loss is not None
+            and bond_prop_loss is not None
+            and mol_feature_loss is not None
+        ):
+            loss = (
+                molecule_modelling_loss
+                + atom_prop_loss
+                + bond_prop_loss
+                + mol_feature_loss
+                + target_loss
+            )
+
+        return XValRegressionOutput(
+            loss=loss,
+            molecule_modelling_loss=molecule_modelling_loss,
+            atom_prop_loss=atom_prop_loss,
+            bond_prop_loss=bond_prop_loss,
+            mol_feature_loss=mol_feature_loss,
             target_loss=target_loss,
             pred_target_values=pred_target_values,
             true_target_values=target_values,  # type: ignore
         )
-    
+
     @staticmethod
     def report_metrics(eval_results):
         (
+            mm_loss,
+            atom_prop_loss,
+            bond_prop_loss,
+            mol_feature_loss,
             target_loss,
             pred_target_values,
             true_target_values,
         ) = eval_results.predictions
 
-        y_true = pred_target_values
-        y_pred = true_target_values
+        y_true = true_target_values
+        y_pred = pred_target_values
 
         r2_score = metrics.r2_score(y_true, y_pred)
         mae = metrics.mean_absolute_error(y_true, y_pred)
         mse = metrics.mean_squared_error(y_true, y_pred)
 
         return {
+            "mm_loss": mm_loss.mean(),
+            "atom_prop_loss": atom_prop_loss.mean(),
+            "bond_prop_loss": bond_prop_loss.mean(),
+            "mol_feature_loss": mol_feature_loss.mean(),
             "target_loss": target_loss.mean(),
             "target_r2": r2_score,
             "target_mae": mae,

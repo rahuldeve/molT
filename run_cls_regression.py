@@ -93,7 +93,7 @@ if __name__ == "__main__":
     model_config = MolTConfig()
     tokenizer = MolTTokenizer(model_config)
 
-    model_dir = download_model_from_wandb("rahul-dev-e", "molt", "molt_large", "v0")
+    model_dir = download_model_from_wandb("rahul-dev-e", "molt", "molt_400K_8EP", "v0")
     model = CLSRegression.from_pretrained(model_dir, config=model_config)
 
     ds = load_gsk_dataset()

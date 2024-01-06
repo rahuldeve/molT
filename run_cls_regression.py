@@ -43,7 +43,7 @@ def train_func(model, ds, data_collator):
         eval_steps=32,
         per_device_train_batch_size=128,
         per_device_eval_batch_size=128,
-        gradient_accumulation_steps=16,
+        gradient_accumulation_steps=2,
         warmup_ratio=0.1,
         report_to="wandb",
         dataloader_num_workers=16,

@@ -94,7 +94,7 @@ if __name__ == "__main__":
     model_config = MolTConfig(target_col_name="par_inh")
     tokenizer = MolTTokenizer(model_config)
 
-    model_dir = download_model_from_wandb("rahul-dev-e", "molt", "molt_400K_8EP", "v0")
+    model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_400K_8EP", "v0")
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = load_gsk_dataset()

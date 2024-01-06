@@ -5,3 +5,4 @@ rdkit
 scikit-learn
 wandb
 nvitop
+astartes[molecules]

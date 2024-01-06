@@ -1,10 +1,12 @@
 import os
 from functools import partial
 
-from datasets import load_dataset
+import pandas as pd
+from astartes import train_test_split
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
+import datasets as hds
 from data import generate_and_scale_mol_descriptors
 from molT import (
     DataCollatorForMaskedMolecularModeling,
@@ -66,25 +68,43 @@ def train_func(model, ds, data_collator):
     trainer.train()
 
 
+def load_gsk_dataset():
+    df = pd.read_csv("./datasets/gsk_processed.csv")
+    splits = train_test_split(
+        X=df["smiles"].to_numpy(),
+        y=df["per_inh"].to_numpy(),
+        sampler="scaffold",
+        random_state=42,
+        return_indices=True,
+    )
+
+    train_ids, val_ids = splits[-2], splits[-1]
+    df_train = df.iloc[train_ids]
+    df_val = df.iloc[val_ids]
+
+    return hds.DatasetDict(
+        {
+            "train": hds.Dataset.from_pandas(df_train, preserve_index=False),
+            "val": hds.Dataset.from_pandas(df_val, preserve_index=False),
+        }
+    )
+
+
 if __name__ == "__main__":
-    model_config = MolTConfig()
+    model_config = MolTConfig(target_col_name="par_inh")
     tokenizer = MolTTokenizer(model_config)
 
     model_dir = download_model_from_wandb("rahul-dev-e", "molt", "molt_large", "v0")
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
-    ds = (
-        load_dataset("sagawa/ZINC-canonicalized")["train"]
-        .select(range(100_000))
-        .train_test_split(seed=42)
-    )
+    ds = load_gsk_dataset()
 
     ds, _ = generate_and_scale_mol_descriptors(
-        ds, model_config.mol_descriptors, num_samples=50_000, num_proc=32
+        ds, model_config.mol_descriptors, num_samples=5000, num_proc=16
     )
 
     tok_func = partial(tokenize, tokenizer=tokenizer)
-    ds = ds.map(tok_func, num_proc=32)
+    ds = ds.map(tok_func, num_proc=16)
 
     tokenizer.pad_token = tokenizer.eos_token
     data_collator = DataCollatorForMaskedMolecularModeling(

@@ -85,13 +85,13 @@ def load_gsk_dataset():
     return hds.DatasetDict(
         {
             "train": hds.Dataset.from_pandas(df_train, preserve_index=False),
-            "val": hds.Dataset.from_pandas(df_val, preserve_index=False),
+            "test": hds.Dataset.from_pandas(df_val, preserve_index=False),
         }
     )
 
 
 if __name__ == "__main__":
-    model_config = MolTConfig(target_col_name="par_inh")
+    model_config = MolTConfig(target_col_name="per_inh")
     tokenizer = MolTTokenizer(model_config)
 
     model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_400K_8EP", "v0")

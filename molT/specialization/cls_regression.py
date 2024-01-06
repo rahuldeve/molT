@@ -59,6 +59,7 @@ class CLSRegression(MolTPreTrainedModel):
         # the following args are not needed but huggingface tokenizer
         # will not send them to the collator if its not specified here
         token_ids: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], CLSRegressionOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):

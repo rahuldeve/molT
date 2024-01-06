@@ -91,7 +91,12 @@ def load_gsk_dataset():
 
 
 if __name__ == "__main__":
-    model_config = MolTConfig(target_col_name="per_inh")
+    model_config = MolTConfig(
+        target_col_name="per_inh",
+        atom_bond_mask_probability=0.15,
+        molecule_feature_mask_probability=0.15,
+        target_mask_probability=0.8
+    )
     tokenizer = MolTTokenizer(model_config)
 
     model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_400K_8EP", "v0")

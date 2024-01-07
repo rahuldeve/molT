@@ -36,14 +36,14 @@ def train_func(model, ds, data_collator):
         output_dir="molT_runs",
         evaluation_strategy="steps",
         learning_rate=1e-4,
-        num_train_epochs=4,
+        num_train_epochs=32,
         weight_decay=0.01,
         push_to_hub=False,
         logging_steps=4,
-        eval_steps=32,
+        eval_steps=8,
         per_device_train_batch_size=128,
         per_device_eval_batch_size=128,
-        gradient_accumulation_steps=2,
+        gradient_accumulation_steps=16,
         warmup_ratio=0.1,
         report_to="wandb",
         dataloader_num_workers=16,
@@ -54,6 +54,7 @@ def train_func(model, ds, data_collator):
         dataloader_drop_last=True,
         bf16=True,
         bf16_full_eval=True,
+        max_grad_norm=0.5
     )
 
     trainer = Trainer(

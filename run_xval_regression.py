@@ -35,7 +35,7 @@ def train_func(model, ds, data_collator):
     training_args = TrainingArguments(
         output_dir="molT_runs",
         evaluation_strategy="steps",
-        learning_rate=1e-4,
+        learning_rate=4e-5,
         num_train_epochs=32,
         weight_decay=0.01,
         push_to_hub=False,
@@ -44,7 +44,7 @@ def train_func(model, ds, data_collator):
         per_device_train_batch_size=128,
         per_device_eval_batch_size=128,
         gradient_accumulation_steps=16,
-        warmup_ratio=0.1,
+        warmup_ratio=0.01,
         report_to="wandb",
         dataloader_num_workers=16,
         lr_scheduler_type=SchedulerType.COSINE,
@@ -71,6 +71,7 @@ def train_func(model, ds, data_collator):
 
 def load_gsk_dataset():
     df = pd.read_csv("./datasets/gsk_processed.csv")
+    df['per_inh'] = df['per_inh'] * 100.0
     splits = train_test_split(
         X=df["smiles"].to_numpy(),
         y=df["per_inh"].to_numpy(),

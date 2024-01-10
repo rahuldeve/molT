@@ -164,6 +164,7 @@ class PositionEmbedder(nn.Module):
 class MolTEmbeddings(nn.Module):
     def __init__(self, config: MolTConfig):
         super().__init__()
+        self.config=config
         self.embeddings = nn.Embedding(
             config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id
         )
@@ -200,10 +201,11 @@ class MolTEmbeddings(nn.Module):
             input_embeddings, mol_feat_mask, mol_features
         )
 
-        target_mask = token_type_ids == TokenType.TGT
-        input_embeddings += self.target_embedding(
-            input_embeddings, target_mask, target_values
-        )
+        if self.config.use_target_token:
+            target_mask = token_type_ids == TokenType.TGT
+            input_embeddings += self.target_embedding(
+                input_embeddings, target_mask, target_values
+            )
 
         atom_props = unpack_atom_properties(atom_props)
         bond_props = unpack_bond_properties(bond_props)

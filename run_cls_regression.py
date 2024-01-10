@@ -95,7 +95,8 @@ if __name__ == "__main__":
     model_config = MolTConfig(target_col_name="per_inh",
         atom_bond_mask_probability=0.0,
         molecule_feature_mask_probability=0.0,
-        target_mask_probability=0.0
+        target_mask_probability=0.0,
+        use_target_token=False
     )
     tokenizer = MolTTokenizer(model_config)
 

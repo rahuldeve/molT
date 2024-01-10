@@ -106,11 +106,21 @@ class MolFeatureEmbedder(nn.Module):
         return mol_feature_embeddings
 
 
+def scale_target(x):
+    # anything above 1 to log(x) + 1
+    x = torch.where(x > 1, torch.log10(x) + 1, x)
+    # anything below 1 to -log(-x) - 1
+    x = torch.where(x < -1, -torch.log10(-x) - 1, x)
+    # anything between -1 and 1 keep same
+    return x
+
+
 class RegressionTargetEmbedder(nn.Module):
     def __init__(self):
         super().__init__()
 
     def forward(self, input_embeddings, target_mask, target_values):
+        target_values = scale_target(target_values)
         target_encoded_embeddings = torch.where(
             target_mask.unsqueeze(-1),
             input_embeddings * target_values.unsqueeze(-1),

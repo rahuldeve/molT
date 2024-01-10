@@ -71,6 +71,7 @@ def train_func(model, ds, data_collator):
 
 def load_gsk_dataset():
     df = pd.read_csv("./datasets/gsk_processed.csv")
+    df['per_inh'] = df['per_inh'] * 100.0
     splits = train_test_split(
         X=df["smiles"].to_numpy(),
         y=df["per_inh"].to_numpy(),

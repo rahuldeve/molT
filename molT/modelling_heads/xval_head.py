@@ -8,8 +8,10 @@ from .base import ExpDive, ModellingHead
 class XValTargetRegressionHead(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
-        self.projection = ModellingHead(1, config)
+        # self.projection = ModellingHead(1, config)
         self.exp_dive = ExpDive()
+        self.linear = nn.Linear(config.hidden_size, config.hidden_size, bias=False)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
     @staticmethod
     def adjust_for_input(target_values, mm_mask, token_type_ids, in_training=True):
@@ -22,8 +24,9 @@ class XValTargetRegressionHead(nn.Module):
         return torch.where(final_mask, 1.0, target_values)
 
     def forward(self, features, target_values, mm_mask, token_type_ids):
-        preds = self.projection(features)
-        preds = self.exp_dive(preds).squeeze()
+        features = self.layer_norm(features)
+        features = self.linear(features)
+        preds = self.exp_dive(features).sum(dim=-1).squeeze()
 
         # calculate loss only for tokens that are mol descriptors and have been masked
         # we do this by zeroing out rmse error based on final_mask

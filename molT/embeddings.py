@@ -216,7 +216,7 @@ class MolTEmbeddings(nn.Module):
         prop_embeddings = atom_prop_embeddings + bond_prop_embeddings
 
         embeddings = torch.cat(
-            [input_embeddings, pos_embeds, token_type_embeds, prop_embeddings], dim=-1
+            [input_embeddings + token_type_embeds + prop_embeddings, pos_embeds], dim=-1
         )
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)

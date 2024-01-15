@@ -51,6 +51,7 @@ class MolTConfig(PretrainedConfig):
         target_mask_probability=0.8,
         target_col_name="qed",
         use_target_token=False,
+        use_mol_descriptor_tokens=True,
         **kwargs,
     ):
         super().__init__(
@@ -99,3 +100,4 @@ class MolTConfig(PretrainedConfig):
         self.target_col_name = target_col_name
         self.feature_names = list(set(descriptors) - set([target_col_name]))
         self.use_target_token = use_target_token
+        self.use_mol_descriptor_tokens = use_mol_descriptor_tokens

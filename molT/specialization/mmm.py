@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Union
 import torch
 from transformers.utils import ModelOutput, logging
 
+from ..config import MolTConfig
 from ..modelling_heads import (
     AtomPropModellingHead,
     BondPropModellingHead,
@@ -30,7 +31,7 @@ class MoleculeModellingOutput(ModelOutput):
 
 
 class MolTForMaskedMM(MolTPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config: MolTConfig):
         super().__init__(config)
         self.config = config
 
@@ -44,8 +45,9 @@ class MolTForMaskedMM(MolTPreTrainedModel):
         self.token_head = TokenModellingHead(config)
         self.atom_prop_head = AtomPropModellingHead(config)
         self.bond_prop_head = BondPropModellingHead(config)
-        self.mol_feat_head = MolFeatureModellingHead(config)
-        self.target_head = TokenModellingHead(config)
+
+        if self.config.use_mol_descriptor_tokens:
+            self.mol_feat_head = MolFeatureModellingHead(config)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -108,7 +110,9 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             ),
             mol_features=MolFeatureModellingHead.adjust_for_input(
                 mol_features, mm_mask, token_type_ids
-            ),
+            )
+            if self.config.use_mol_descriptor_tokens
+            else None,
         )
 
         sequence_output = outputs[0]
@@ -124,44 +128,48 @@ class MolTForMaskedMM(MolTPreTrainedModel):
             sequence_output, bond_props, mm_mask, token_type_ids
         )
 
-        mol_feature_loss, _ = self.mol_feat_head(
-            sequence_output, mol_features, mm_mask, token_type_ids
-        )
+        if self.config.use_mol_descriptor_tokens:
+            mol_feature_loss, _ = self.mol_feat_head(
+                sequence_output, mol_features, mm_mask, token_type_ids
+            )
 
         loss = None
         if (
             molecule_modelling_loss is not None
             and atom_prop_loss is not None
             and bond_prop_loss is not None
-            and mol_feature_loss is not None
         ):
-            loss = (
-                molecule_modelling_loss
-                + atom_prop_loss
-                + bond_prop_loss
-                + mol_feature_loss
-            )
+            loss = molecule_modelling_loss + atom_prop_loss + bond_prop_loss
+
+        if self.config.use_mol_descriptor_tokens:
+            loss += mol_feature_loss
 
         return MoleculeModellingOutput(
             loss=loss,
             molecule_modelling_loss=molecule_modelling_loss,
             atom_prop_loss=atom_prop_loss,
             bond_prop_loss=bond_prop_loss,
-            mol_feature_loss=mol_feature_loss,
+            mol_feature_loss=(
+                mol_feature_loss if self.config.use_mol_descriptor_tokens else None
+            ),
         )
 
-    @staticmethod
-    def report_metrics(eval_results):
+    def report_metrics(self, eval_results):
         (
             mm_loss,
             atom_prop_loss,
             bond_prop_loss,
-            mol_feature_loss,
+            *rest
         ) = eval_results.predictions
 
-        return {
+        ret_dict = {
             "mm_loss": mm_loss.mean(),
             "atom_prop_loss": atom_prop_loss.mean(),
             "bond_prop_loss": bond_prop_loss.mean(),
-            "mol_feature_loss": mol_feature_loss.mean(),
         }
+
+        if self.config.use_mol_descriptor_tokens:
+            (mol_feature_loss, *rest) = rest
+            ret_dict["mol_feature_loss"] = mol_feature_loss.mean()
+
+        return ret_dict

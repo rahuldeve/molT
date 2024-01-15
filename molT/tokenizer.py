@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import chain
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -15,8 +16,6 @@ from transformers.tokenization_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-
-from itertools import chain
 
 from .config import MolTConfig
 from .utils import TokenType, pack_atom_properties, pack_bond_properties
@@ -323,70 +322,80 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         token_type_ids[bond_mask] = TokenType.BOND.value
 
         # append mol_prop tokens
-        mol_features = np.array([kwargs[feat] for feat in self.config.feature_names])
-        n_mol_feats = mol_features.shape[0]
+        if self.config.use_mol_descriptor_tokens:
+            mol_features = np.array(
+                [kwargs[feat] for feat in self.config.feature_names]
+            )
+            n_mol_feats = mol_features.shape[0]
 
-        mol_feature_input_ids = [self.encoder[x] for x in self.config.feature_names]
-        input_ids = np.concatenate([input_ids, mol_feature_input_ids], axis=-1)
+            mol_feature_input_ids = [self.encoder[x] for x in self.config.feature_names]
+            input_ids = np.concatenate([input_ids, mol_feature_input_ids], axis=-1)
 
-        mol_feat_pad_len = input_ids.shape[0] - mol_features.shape[0]
-        mol_features = np.pad(mol_features, (mol_feat_pad_len, 0), constant_values=0.0)
+            mol_feat_pad_len = input_ids.shape[0] - mol_features.shape[0]
+            mol_features = np.pad(
+                mol_features, (mol_feat_pad_len, 0), constant_values=0.0
+            )
 
-        token_type_ids = np.pad(
-            token_type_ids, (0, n_mol_feats), constant_values=TokenType.FEAT.value
-        )
+            token_type_ids = np.pad(
+                token_type_ids, (0, n_mol_feats), constant_values=TokenType.FEAT.value
+            )
 
-        tokens = np.pad(token_ids, (0, n_mol_feats), constant_values=0)
-        pos_embed_ids = np.pad(
-            pos_embed_ids, ((0, n_mol_feats), (0, 0)), constant_values=0
-        )  # type: ignore
-        lp_embeds = np.pad(lp_embeds, ((0, n_mol_feats), (0, 0)), constant_values=0)
-        atom_props = np.pad(atom_props, ((0, 0), (0, n_mol_feats)), constant_values=0)  # type: ignore
-        bond_props = np.pad(bond_props, ((0, 0), (0, n_mol_feats)), constant_values=0)  # type: ignore
+            token_ids = np.pad(token_ids, (0, n_mol_feats), constant_values=0)
+            pos_embed_ids = np.pad(
+                pos_embed_ids, ((0, n_mol_feats), (0, 0)), constant_values=0
+            )  # type: ignore
+            lp_embeds = np.pad(lp_embeds, ((0, n_mol_feats), (0, 0)), constant_values=0)
+            atom_props = np.pad(
+                atom_props, ((0, 0), (0, n_mol_feats)), constant_values=0
+            )  # type: ignore
+            bond_props = np.pad(
+                bond_props, ((0, 0), (0, n_mol_feats)), constant_values=0
+            )  # type: ignore
 
         # Add target value tokens
-        input_ids = np.pad(
-            input_ids, (0, 1), constant_values=self.encoder[self.target_token]
-        )
+        if self.config.use_target_token:
+            input_ids = np.pad(
+                input_ids, (0, 1), constant_values=self.encoder[self.target_token]
+            )
 
-        target_values = np.zeros_like(input_ids, dtype=float)
-        target_values[-1] = kwargs[self.config.target_col_name]
+            target_values = np.zeros_like(input_ids, dtype=float)
+            target_values[-1] = kwargs[self.config.target_col_name]
 
-        token_type_ids = np.pad(
-            token_type_ids, (0, 1), constant_values=TokenType.TGT.value
-        )
+            token_type_ids = np.pad(
+                token_type_ids, (0, 1), constant_values=TokenType.TGT.value
+            )
 
-        tokens = np.pad(tokens, (0, 1), constant_values=0)
-        pos_embed_ids = np.pad(pos_embed_ids, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
-        lp_embeds = np.pad(lp_embeds, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
-        atom_props = np.pad(atom_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
-        bond_props = np.pad(bond_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
-        mol_features = np.pad(mol_features, (0, 1), constant_values=0)  # type: ignore
+            token_ids = np.pad(token_ids, (0, 1), constant_values=0)
+            pos_embed_ids = np.pad(pos_embed_ids, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
+            lp_embeds = np.pad(lp_embeds, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
+            atom_props = np.pad(atom_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
+            bond_props = np.pad(bond_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
+            mol_features = np.pad(mol_features, (0, 1), constant_values=0)  # type: ignore
+        else:
+            target_values = kwargs[self.config.target_col_name]
 
         # convert to lists for easier processing later
         # flattening pos_embeds for compatiability with BatchEncoding and DataCollator
         # maybe do list conversion after special_tokens?
-        token_ids = tokens.astype(int).tolist()
-        input_ids = input_ids.astype(int).tolist()
-        pos_embed_ids = pos_embed_ids.flatten().tolist()
-        lp_embeds = lp_embeds.flatten().tolist()
-        token_type_ids = token_type_ids.astype(int).tolist()
-        atom_props = atom_props.tolist()
-        bond_props = bond_props.tolist()
-        mol_features = mol_features.tolist()
-        target_values = target_values.tolist()
 
         encoded_inputs = {
-            "token_ids": token_ids,
-            "input_ids": input_ids,
-            "pos_embed_ids": pos_embed_ids,
-            "lp_embeds": lp_embeds,
-            "token_type_ids": token_type_ids,
-            "atom_props": atom_props,
-            "bond_props": bond_props,
-            "mol_features": mol_features,
+            "token_ids": token_ids.astype(int).tolist(),
+            "input_ids": input_ids.astype(int).tolist(),
+            "pos_embed_ids": pos_embed_ids.flatten().tolist(),
+            "lp_embeds": lp_embeds.flatten().tolist(),
+            "token_type_ids": token_type_ids.astype(int).tolist(),
+            "atom_props": atom_props.tolist(),
+            "bond_props": bond_props.tolist(),
             "target_values": target_values,
         }
+
+        if self.config.use_mol_descriptor_tokens:
+            encoded_inputs["mol_features"] = mol_features.tolist()
+
+        if self.config.use_target_token:
+            encoded_inputs["target_values"] = target_values.tolist()
+        else:
+            encoded_inputs["target_values"] = target_values
 
         if truncation_strategy != TruncationStrategy.DO_NOT_TRUNCATE:
             raise ValueError("Truncation for molecules does not make sense")
@@ -410,11 +419,14 @@ class MolTTokenizer(PreTrainedTokenizerBase):
                 entry.insert(0, 0)
                 entry.append(0)
 
-            encoded_inputs["mol_features"].insert(0, 0.0)
-            encoded_inputs["mol_features"].append(0.0)
+            if self.config.use_mol_descriptor_tokens:
+                encoded_inputs["mol_features"].insert(0, 0.0)
+                encoded_inputs["mol_features"].append(0.0)
 
-            encoded_inputs["target_values"].insert(0, 0.0)
-            encoded_inputs["target_values"].append(0.0)
+            if self.config.use_target_token:
+                encoded_inputs["target_values"].insert(0, 0.0)
+                encoded_inputs["target_values"].append(0.0)
+            
 
             encoded_inputs["pos_embed_ids"] = (
                 [0.0] * 2 + encoded_inputs["pos_embed_ids"] + [0.0] * 2
@@ -570,6 +582,11 @@ class MolTTokenizer(PreTrainedTokenizerBase):
                 "mol_features": lambda x: x + [0] * difference,
                 "target_values": lambda x: x + [0] * difference,
             }
+
+            if self.config.use_target_token:
+                padding_funcs["target_values"] = lambda x: x + [0] * difference
+            else:
+                padding_funcs["target_values"] = lambda x: x
 
             for k in encoded_inputs.keys():
                 encoded_inputs[k] = padding_funcs[k](encoded_inputs[k])

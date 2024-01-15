@@ -172,8 +172,12 @@ class MolTEmbeddings(nn.Module):
         self.pos_embeddings = PositionEmbedder(config)
         self.atom_prop_embeddings = AtomPropertyEmbedder(config)
         self.bond_prop_embeddings = BondPropertyEmbedder(config)
-        self.mol_feature_embeddings = MolFeatureEmbedder()
-        self.target_embedding = RegressionTargetEmbedder()
+
+        if self.config.use_mol_descriptor_tokens:
+            self.mol_feature_embeddings = MolFeatureEmbedder()
+
+        if self.config.use_target_token:
+            self.target_embedding = RegressionTargetEmbedder(config)
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -197,10 +201,11 @@ class MolTEmbeddings(nn.Module):
         token_type_embeds = self.type_embeddings(token_type_ids)
         input_embeddings = self.embeddings(input_ids)
 
-        mol_feat_mask = token_type_ids == TokenType.FEAT
-        input_embeddings += self.mol_feature_embeddings(
-            input_embeddings, mol_feat_mask, mol_features
-        )
+        if self.config.use_mol_descriptor_tokens:
+            mol_feat_mask = token_type_ids == TokenType.FEAT
+            input_embeddings += self.mol_feature_embeddings(
+                input_embeddings, mol_feat_mask, mol_features
+            )
 
         if self.config.use_target_token:
             target_mask = token_type_ids == TokenType.TGT
@@ -216,7 +221,7 @@ class MolTEmbeddings(nn.Module):
         prop_embeddings = atom_prop_embeddings + bond_prop_embeddings
 
         embeddings = torch.cat(
-            [input_embeddings + token_type_embeds + prop_embeddings, pos_embeds], dim=-1
+            [input_embeddings + token_type_embeds, prop_embeddings, pos_embeds], dim=-1
         )
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)

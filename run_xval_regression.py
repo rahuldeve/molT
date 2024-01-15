@@ -2,7 +2,7 @@ import os
 from functools import partial
 
 import pandas as pd
-from astartes import train_test_split
+from astartes import train_val_test_split
 from transformers import Trainer, TrainingArguments
 from transformers.trainer_utils import SchedulerType
 
@@ -62,7 +62,7 @@ def train_func(model, ds, data_collator):
         model=model,
         args=training_args,
         train_dataset=ds["train"],
-        eval_dataset=ds["test"],
+        eval_dataset={'val': ds["val"], 'test': ds['test']},
         data_collator=data_collator,
         compute_metrics=model.report_metrics,
     )
@@ -73,22 +73,24 @@ def train_func(model, ds, data_collator):
 def load_gsk_dataset():
     df = pd.read_csv("./datasets/gsk_processed.csv")
     df['per_inh'] = df['per_inh'] * 100.0
-    splits = train_test_split(
+    splits = train_val_test_split(
         X=df["smiles"].to_numpy(),
         y=df["per_inh"].to_numpy(),
-        sampler="scaffold",
+        sampler="random",
         random_state=42,
         return_indices=True,
     )
 
-    train_ids, val_ids = splits[-2], splits[-1]
+    train_ids, val_ids, test_ids = splits[-3], splits[-2], splits[-1]
     df_train = df.iloc[train_ids]
     df_val = df.iloc[val_ids]
+    df_test = df.iloc[test_ids]
 
     return hds.DatasetDict(
         {
             "train": hds.Dataset.from_pandas(df_train, preserve_index=False),
-            "test": hds.Dataset.from_pandas(df_val, preserve_index=False),
+            "val": hds.Dataset.from_pandas(df_val, preserve_index=False),
+            "test": hds.Dataset.from_pandas(df_test, preserve_index=False),
         }
     )
 

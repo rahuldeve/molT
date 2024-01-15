@@ -139,7 +139,8 @@ class MolTLayer(nn.Module):
         return outputs
 
     def feed_forward_chunk(self, attention_output):
-        attention_output = self.pre_ln(attention_output)
-        intermediate_output = self.intermediate(attention_output)
+        intermediate_output = self.intermediate(
+            self.pre_ln(attention_output)
+        )
         layer_output = self.output(intermediate_output, attention_output)
         return layer_output

@@ -241,10 +241,10 @@ class MolTAttention(nn.Module):
         output_attentions: Optional[bool] = False,
     ) -> Tuple[torch.Tensor]:
         
-        hidden_states = self.pre_ln(hidden_states)
+        # hidden_states = self.pre_ln(hidden_states)
         
         self_outputs = self.self(
-            hidden_states,
+            self.pre_ln(hidden_states),
             attention_mask,
             head_mask,
             encoder_hidden_states,

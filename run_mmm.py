@@ -15,6 +15,7 @@ from molT import (
 
 os.environ["WANDB_PROJECT"] = "molt"
 os.environ["WANDB_LOG_MODEL"] = "checkpoint"
+os.environ["WANDB_WATCH"] = "all"
 
 
 def tokenize(entry, tokenizer):

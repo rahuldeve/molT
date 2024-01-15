@@ -17,6 +17,7 @@ from molT import (
 from utils import download_model_from_wandb
 
 os.environ["WANDB_PROJECT"] = "molt_ablation"
+os.environ["WANDB_WATCH"] = "all"
 
 
 def tokenize(entry, tokenizer):

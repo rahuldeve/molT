@@ -70,7 +70,12 @@ def train_func(model, ds, data_collator):
 
 
 if __name__ == "__main__":
-    model_config = MolTConfig()
+    model_config = MolTConfig(
+        atom_bond_mask_probability=0.15,
+        molecule_feature_mask_probability=0.15,
+        use_mol_descriptor_tokens=True,
+        use_target_token=False
+    )
     tokenizer = MolTTokenizer(model_config)
     model = MolTForMaskedMM(model_config)
 

@@ -81,7 +81,7 @@ class MolTConfig(PretrainedConfig):
         
         self.laplace_embeds_size = laplace_embeds_size
         self.embedding_size = embedding_size
-        self.hidden_size = 2 * self.embedding_size
+        self.hidden_size = 2 * self.embedding_size + 2 * laplace_embeds_size
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
         self.hidden_act = hidden_act

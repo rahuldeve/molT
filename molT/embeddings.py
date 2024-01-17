@@ -158,8 +158,8 @@ class PositionEmbedder(nn.Module):
         bond_mask = token_type_ids == TokenType.BOND
         atom_bond_mask = atom_mask | bond_mask
         pos_embeds = torch.where(atom_bond_mask.unsqueeze(-1), pos_embeds, 0.0)
-        n_repeat = self.config.embedding_size // (2*self.config.laplace_embeds_size)
-        return pos_embeds.repeat((1, 1, n_repeat))
+        # n_repeat = self.config.embedding_size // (2*self.config.laplace_embeds_size)
+        return pos_embeds
 
 
 class MolTEmbeddings(nn.Module):

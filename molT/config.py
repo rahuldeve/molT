@@ -32,7 +32,7 @@ class MolTConfig(PretrainedConfig):
         laplace_embeds_size=12,
         embedding_size=384,
         num_hidden_layers=4,
-        num_attention_heads=12,
+        num_attention_heads=24,
         intermediate_size_multiplier=4,
         hidden_act="gelu",
         hidden_dropout_prob=0.1,

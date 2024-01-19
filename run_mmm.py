@@ -35,7 +35,7 @@ def train_func(model, ds, data_collator):
         output_dir="molT_runs",
         evaluation_strategy="steps",
         learning_rate=1e-4,
-        num_train_epochs=4,
+        num_train_epochs=8,
         weight_decay=0.01,
         push_to_hub=False,
         logging_steps=8,
@@ -43,12 +43,12 @@ def train_func(model, ds, data_collator):
         per_device_train_batch_size=256,
         per_device_eval_batch_size=256,
         gradient_accumulation_steps=8,
-        warmup_ratio=0.1,
+        warmup_ratio=0.05,
         report_to="wandb",
         dataloader_num_workers=16,
         lr_scheduler_type=SchedulerType.COSINE,
         data_seed=42,
-        run_name="molt_large",
+        run_name="molt_ph1",
         dataloader_pin_memory=True,
         dataloader_drop_last=True,
         max_grad_norm=0.5,
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     model_config = MolTConfig(
         atom_bond_mask_probability=0.15,
         molecule_feature_mask_probability=0.15,
-        use_mol_descriptor_tokens=True,
-        use_target_token=False
+        use_mol_descriptor_tokens=False,
+        use_target_token=False,
     )
     tokenizer = MolTTokenizer(model_config)
     model = MolTForMaskedMM(model_config)

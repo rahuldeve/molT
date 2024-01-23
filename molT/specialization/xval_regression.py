@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 
 import torch
+import torch.nn as nn
 from sklearn import metrics
 from transformers.utils import ModelOutput, logging
 
@@ -47,6 +48,7 @@ class XValRegression(MolTPreTrainedModel):
         self.bond_prop_head = BondPropModellingHead(config)
         self.mol_feat_head = MolFeatureModellingHead(config)
         self.target_head = XValTargetRegressionHead(config)
+        self.ln = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -116,7 +118,7 @@ class XValRegression(MolTPreTrainedModel):
             ),
         )
 
-        sequence_output = outputs[0]
+        sequence_output = self.ln(outputs[0])
         molecule_modelling_loss, _ = self.token_head(
             sequence_output, labels, mm_mask, token_type_ids
         )

@@ -9,16 +9,16 @@ class ModellingHead(nn.Module):
         super().__init__()
         self.out_size = out_size
         # self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        # self.layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
         self.decoder = nn.Linear(config.hidden_size, out_size, bias=False)
 
     def forward(self, features):
         # x = self.dense(features)
-        x = self.layer_norm(features)
+        # x = self.layer_norm(features)
 
         # project back to size of vocabulary with bias
-        x = self.decoder(x)
+        x = self.decoder(features)
 
         return x
 

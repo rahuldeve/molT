@@ -16,8 +16,16 @@ class ExpDive(nn.Module):
 class MolFeatureModellingHead(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
-        self.projection = ModellingHead(1, config)
-        self.exp_dive = ExpDive()
+        self.projection = nn.Linear(
+            nn.Linear(config.hidden_size, config.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(config.hidden_size, config.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(config.hidden_size, 1)
+        )
+        # self.exp_dive = ExpDive()
 
     @staticmethod
     @torch.no_grad()
@@ -27,8 +35,8 @@ class MolFeatureModellingHead(nn.Module):
         return torch.where(final_mask, 1.0, mol_features)
 
     def forward(self, features, mol_features, mm_mask, token_type_ids):
-        preds = self.projection(features)
-        preds = self.exp_dive(preds).squeeze()
+        preds = self.projection(features).squeeze()
+        # preds = self.exp_dive(preds).squeeze()
 
         # calculate loss only for tokens that are mol descriptors and have been masked
         # we do this by zeroing out rmse error based on final_mask

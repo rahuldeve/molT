@@ -100,12 +100,13 @@ if __name__ == "__main__":
         target_col_name="per_inh",
         atom_bond_mask_probability=0.15,
         molecule_feature_mask_probability=0.15,
-        target_mask_probability=0.8,
+        target_mask_probability=0.15,
+        use_mol_descriptor_tokens=True,
         use_target_token=True
     )
     tokenizer = MolTTokenizer(model_config)
 
-    model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_400K_8EP", "v0")
+    model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_ph2", "v0")
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = load_gsk_dataset()

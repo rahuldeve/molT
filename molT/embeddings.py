@@ -177,7 +177,7 @@ class MolTEmbeddings(nn.Module):
             self.mol_feature_embeddings = MolFeatureEmbedder()
 
         if self.config.use_target_token:
-            self.target_embedding = RegressionTargetEmbedder(config)
+            self.target_embedding = RegressionTargetEmbedder()
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)

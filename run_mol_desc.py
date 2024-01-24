@@ -82,9 +82,7 @@ if __name__ == "__main__":
 
     model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_ph1", "v0")
     model = MolTForMaskedMM.from_pretrained(model_dir, config=model_config)
-
-    model = MolTForMaskedMM.from_pretrained(model_config)
-
+    
     ds = (
         load_dataset("sagawa/ZINC-canonicalized")["validation"]
         .select(range(500_000))

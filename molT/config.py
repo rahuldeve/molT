@@ -76,12 +76,10 @@ class MolTConfig(PretrainedConfig):
         )
 
         assert(embedding_size % laplace_embeds_size == 0)
-        assert(embedding_size % 3 == 0)
-        assert(embedding_size % 4 == 0)
         
         self.laplace_embeds_size = laplace_embeds_size
         self.embedding_size = embedding_size
-        self.hidden_size = 2 * self.embedding_size + 2 * laplace_embeds_size
+        self.hidden_size = self.embedding_size + 2 * laplace_embeds_size
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
         self.hidden_act = hidden_act

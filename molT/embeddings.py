@@ -9,22 +9,20 @@ from .utils import TokenType, unpack_atom_properties, unpack_bond_properties
 class AtomPropertyEmbedder(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
-        self.per_prop_embedding_size = config.embedding_size // 4
-        assert self.per_prop_embedding_size * 4 == config.embedding_size
 
         self.in_ring_embedding = nn.Embedding(
-            3, self.per_prop_embedding_size, padding_idx=0
+            3, config.embedding_size, padding_idx=0
         )
         self.charge_embedding = nn.Embedding(
-            4, self.per_prop_embedding_size, padding_idx=0
+            4, config.embedding_size, padding_idx=0
         )
         self.hybridization_embedding = nn.Embedding(
             len(HybridizationType.values) + 1,
-            self.per_prop_embedding_size,
+            config.embedding_size,
             padding_idx=0,
         )
         self.chirality_embedding = nn.Embedding(
-            len(ChiralType.values) + 1, self.per_prop_embedding_size, padding_idx=0
+            len(ChiralType.values) + 1, config.embedding_size, padding_idx=0
         )
 
     def forward(
@@ -41,14 +39,11 @@ class AtomPropertyEmbedder(nn.Module):
         )
         chirality_embedding = self.chirality_embedding(prop_atom_chirality.long())
 
-        prop_embedding = torch.cat(
-            [
-                in_ring_embeds,
-                charge_embedding,
-                hybridization_embedding,
-                chirality_embedding,
-            ],
-            dim=-1,
+        prop_embedding = (
+            in_ring_embeds
+            + charge_embedding
+            + hybridization_embedding
+            + chirality_embedding
         )
 
         return prop_embedding
@@ -57,19 +52,17 @@ class AtomPropertyEmbedder(nn.Module):
 class BondPropertyEmbedder(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
-        self.per_prop_embedding_size = config.embedding_size // 3
-        assert self.per_prop_embedding_size * 3 == config.embedding_size
 
         self.aromatic_embedding = nn.Embedding(
-            3, self.per_prop_embedding_size, padding_idx=0
+            3, config.embedding_size, padding_idx=0
         )
 
         self.conjugated_embedding = nn.Embedding(
-            3, self.per_prop_embedding_size, padding_idx=0
+            3, config.embedding_size, padding_idx=0
         )
 
         self.stereo_embedding = nn.Embedding(
-            len(StereoType.values) + 1, self.per_prop_embedding_size, padding_idx=0
+            len(StereoType.values) + 1, config.embedding_size, padding_idx=0
         )
 
     def forward(
@@ -82,14 +75,7 @@ class BondPropertyEmbedder(nn.Module):
         conjugated_embeds = self.conjugated_embedding(prop_bond_conjugated.long())
         stereo_embeds = self.stereo_embedding(prop_bond_stereo.long())
 
-        prop_embedding = torch.cat(
-            [
-                aromatic_embeds,
-                conjugated_embeds,
-                stereo_embeds,
-            ],
-            dim=-1,
-        )
+        prop_embedding = aromatic_embeds + conjugated_embeds + stereo_embeds
         return prop_embedding
 
 
@@ -165,7 +151,7 @@ class PositionEmbedder(nn.Module):
 class MolTEmbeddings(nn.Module):
     def __init__(self, config: MolTConfig):
         super().__init__()
-        self.config=config
+        self.config = config
         self.embeddings = nn.Embedding(
             config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id
         )
@@ -221,7 +207,7 @@ class MolTEmbeddings(nn.Module):
         prop_embeddings = atom_prop_embeddings + bond_prop_embeddings
 
         embeddings = torch.cat(
-            [input_embeddings + token_type_embeds, prop_embeddings, pos_embeds], dim=-1
+            [input_embeddings + token_type_embeds + prop_embeddings, pos_embeds], dim=-1
         )
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)

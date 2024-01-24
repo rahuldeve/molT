@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import rdkit.Chem as Chem
 
 
@@ -46,14 +46,11 @@ def generate_and_scale_mol_descriptors(
     random_samples = ds["train"].select(rand_ids).select_columns(descriptor_names)
     random_samples = random_samples.to_pandas()
 
-    scaler = StandardScaler().set_output(transform="pandas")
+    scaler = MinMaxScaler(feature_range=(-1, 1)).set_output(transform="pandas")
     scaler = scaler.fit(random_samples)  # type: ignore
 
     ds = ds.map(
-        scale_batch,
-        fn_kwargs={"scaler": scaler},
-        batched=True,
-        num_proc=num_proc
+        scale_batch, fn_kwargs={"scaler": scaler}, batched=True, num_proc=num_proc
     )
 
     return ds, scaler

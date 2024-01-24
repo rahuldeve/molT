@@ -16,7 +16,7 @@ class ExpDive(nn.Module):
 class MolFeatureModellingHead(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
-        self.projection = nn.Linear(
+        self.projection = nn.Sequential(
             nn.Linear(config.hidden_size, config.hidden_size),
             nn.ReLU(),
             nn.Dropout(config.hidden_dropout_prob),

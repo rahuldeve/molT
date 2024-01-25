@@ -4,3 +4,4 @@ from .mol_features import MolFeatureModellingHead
 from .token import TokenModellingHead
 from .cls_head import CLSTargetRegressionHead
 from .xval_head import XValTargetRegressionHead
+from .summation_head import SumRegressionHead

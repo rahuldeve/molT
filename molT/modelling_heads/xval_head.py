@@ -10,13 +10,9 @@ class XValTargetRegressionHead(nn.Module):
         super().__init__()
         # self.projection = ModellingHead(1, config)
         self.linear = nn.Sequential(
-            nn.Linear(config.hidden_size, config.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(config.hidden_dropout_prob),
-            nn.Linear(config.hidden_size, config.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(config.hidden_dropout_prob),
-            nn.Linear(config.hidden_size, 1)
+            nn.Linear(config.hidden_size, config.hidden_size//16),
+            nn.PReLU(),
+            nn.Linear(config.hidden_size//16, 1),
         )
         # self.layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
@@ -33,7 +29,7 @@ class XValTargetRegressionHead(nn.Module):
     def forward(self, features, target_values, mm_mask, token_type_ids):
         # features = self.layer_norm(features)
         features = self.linear(features)
-        preds = features.sum(dim=-1).squeeze()
+        preds = features.squeeze()
 
         # calculate loss only for tokens that are mol descriptors and have been masked
         # we do this by zeroing out rmse error based on final_mask

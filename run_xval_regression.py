@@ -36,16 +36,15 @@ def train_func(model, ds, data_collator):
     training_args = TrainingArguments(
         output_dir="molT_runs",
         evaluation_strategy="steps",
-        learning_rate=2e-5,
-        num_train_epochs=32,
-        weight_decay=0.01,
+        learning_rate=2e-4,
+        num_train_epochs=64,
+        weight_decay=0.1,
         push_to_hub=False,
-        logging_steps=4,
-        eval_steps=8,
-        per_device_train_batch_size=128,
-        per_device_eval_batch_size=128,
-        gradient_accumulation_steps=2,
-        warmup_ratio=0.01,
+        logging_steps=8,
+        eval_steps=32,
+        per_device_train_batch_size=53,
+        per_device_eval_batch_size=53,
+        warmup_ratio=0.1,
         report_to="wandb",
         dataloader_num_workers=16,
         lr_scheduler_type=SchedulerType.COSINE,
@@ -53,8 +52,8 @@ def train_func(model, ds, data_collator):
         run_name="molt_xval",
         dataloader_pin_memory=True,
         dataloader_drop_last=True,
-        # bf16=True,
-        # bf16_full_eval=True,
+        bf16=True,
+        bf16_full_eval=True,
         max_grad_norm=0.5
     )
 
@@ -72,7 +71,7 @@ def train_func(model, ds, data_collator):
 
 def load_gsk_dataset():
     df = pd.read_csv("./datasets/gsk_processed.csv")
-    df['per_inh'] = df['per_inh'] * 100.0
+    df['per_inh'] = df['per_inh']
     splits = train_val_test_split(
         X=df["smiles"].to_numpy(),
         y=df["per_inh"].to_numpy(),

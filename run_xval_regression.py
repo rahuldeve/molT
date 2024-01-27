@@ -36,14 +36,14 @@ def train_func(model, ds, data_collator):
     training_args = TrainingArguments(
         output_dir="molT_runs",
         evaluation_strategy="steps",
-        learning_rate=2e-4,
-        num_train_epochs=64,
+        learning_rate=4e-4,
+        num_train_epochs=32,
         weight_decay=0.1,
         push_to_hub=False,
         logging_steps=8,
         eval_steps=32,
-        per_device_train_batch_size=53,
-        per_device_eval_batch_size=53,
+        per_device_train_batch_size=64,
+        per_device_eval_batch_size=64,
         warmup_ratio=0.1,
         report_to="wandb",
         dataloader_num_workers=16,
@@ -99,14 +99,13 @@ if __name__ == "__main__":
         target_col_name="per_inh",
         atom_bond_mask_probability=0.15,
         molecule_feature_mask_probability=0.15,
-        target_mask_probability=0.8,
+        target_mask_probability=0.9,
         use_mol_descriptor_tokens=True,
         use_target_token=True,
-        num_hidden_layers=5
     )
     tokenizer = MolTTokenizer(model_config)
 
-    model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_ph2", "v0")
+    model_dir = download_model_from_wandb("rahul-e-dev", "molt", "molt_ph2_1", "v0")
     model = XValRegression.from_pretrained(model_dir, config=model_config)
 
     ds = load_gsk_dataset()

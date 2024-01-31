@@ -21,7 +21,7 @@ def pack_atom_properties(
             prop_atom_chirality,
         ],
         axis=0,
-    )
+    ).T
 
 
 def unpack_atom_properties(atom_properties):
@@ -45,7 +45,7 @@ def unpack_atom_properties(atom_properties):
 def pack_bond_properties(*, prop_bond_aromatic, prop_bond_conjugated, prop_bond_stereo):
     return np.stack(
         [prop_bond_aromatic, prop_bond_conjugated, prop_bond_stereo], axis=0
-    )
+    ).T
 
 
 def unpack_bond_properties(bond_properties):

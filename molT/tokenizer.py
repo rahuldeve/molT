@@ -1,6 +1,6 @@
 from collections import defaultdict
 from itertools import chain
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Mapping, Optional, Sized, Union
 
 import numpy as np
 from rdkit import Chem
@@ -16,6 +16,8 @@ from transformers.tokenization_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
+
+from transformers.utils import to_py_obj, is_torch_tensor, is_tf_tensor
 
 from .config import MolTConfig
 from .utils import TokenType, pack_atom_properties, pack_bond_properties
@@ -46,15 +48,13 @@ def get_lp_embeddings(adj_mat, k, flip_signs=True):
     return eig_vec
 
 
-def get_atom_properties(mol):
+def get_atom_types_and_properties(mol):
     atoms = []
     in_ring = []
     charge = []
     hybridization = []
     chirality = []
-    idxs = []
     for atom in mol.GetAtoms():
-        idxs.append(atom.GetIdx())
         atoms.append(atom.GetSymbol())
         in_ring.append(atom.IsInRing())
         charge.append(atom.GetFormalCharge())
@@ -71,21 +71,16 @@ def get_atom_properties(mol):
     return atoms, properties
 
 
-def get_bond_properties(mol):
+def get_bond_types_and_properties(mol):
     bonds = []
     aromatic = []
     conjugated = []
     stereo = []
-    edge_list = np.zeros((mol.GetNumBonds(), 2), dtype=np.uint)
     for bond in mol.GetBonds():
-        idx = bond.GetIdx()
         bonds.append(bond.GetBondType().name)
         aromatic.append(bond.GetIsAromatic())
         conjugated.append(bond.GetIsConjugated())
         stereo.append(bond.GetStereo().real)
-
-        edge_list[idx, 0] = bond.GetBeginAtomIdx()
-        edge_list[idx, 1] = bond.GetEndAtomIdx()
 
     # adding 1 to make space for null embeds
     properties = {
@@ -94,40 +89,40 @@ def get_bond_properties(mol):
         "prop_bond_stereo": np.array(stereo, dtype=int) + 1,
     }
 
-    return bonds, edge_list, properties
+    return bonds, properties
 
 
 # Test this function
-def generate_tokens_atom_bond_mask_pos_embed_ids(edge_list):
+def get_token_ids_token_type_ids_pos_embed_ids(mol):
     tokens = []
-    atom_mask = []
+    token_type_ids = []
     pos_embed_ids = []
     atoms_seen = set()
-    for bond_idx in range(edge_list.shape[0]):
-        st_atom_idx = edge_list[bond_idx, 0]
-        en_atom_idx = edge_list[bond_idx, 1]
+    for bond in mol.GetBonds():
+        bond_idx = bond.GetIdx()
+        st_atom_idx = bond.GetBeginAtomIdx()
+        en_atom_idx = bond.GetEndAtomIdx()
 
         if st_atom_idx not in atoms_seen:
             tokens.append(st_atom_idx)
-            atom_mask.append(True)
+            token_type_ids.append(TokenType.ATOM)
             pos_embed_ids.append([st_atom_idx, st_atom_idx])
             atoms_seen.add(st_atom_idx)
 
         tokens.append(bond_idx)
-        atom_mask.append(False)
+        token_type_ids.append(TokenType.BOND)
         pos_embed_ids.append([st_atom_idx, en_atom_idx])
 
         if en_atom_idx not in atoms_seen:
             tokens.append(en_atom_idx)
-            atom_mask.append(True)
+            token_type_ids.append(TokenType.ATOM)
             atoms_seen.add(en_atom_idx)
             pos_embed_ids.append([en_atom_idx, en_atom_idx])
 
     tokens = np.array(tokens, dtype=np.uint)
-    atom_mask = np.array(atom_mask, dtype=bool)
-    bond_mask = ~atom_mask
+    token_type_ids = np.array(token_type_ids, dtype=np.uint)
     pos_embed_ids = np.stack(pos_embed_ids, axis=0)
-    return tokens, atom_mask, bond_mask, pos_embed_ids
+    return tokens, token_type_ids, pos_embed_ids
 
 
 class MolTTokenizer(PreTrainedTokenizerBase):
@@ -274,52 +269,29 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         adj_mat = Chem.rdmolops.GetAdjacencyMatrix(mol)  # type: ignore
         lp_embeds = get_lp_embeddings(adj_mat, self.laplace_embedding_dim)
 
-        atoms, atom_props = get_atom_properties(mol)
-        bonds, edge_list, bond_props = get_bond_properties(mol)
+        atom_types, atom_props = get_atom_types_and_properties(mol)
+        bond_types, bond_props = get_bond_types_and_properties(mol)
 
         (
             token_ids,
-            atom_mask,
-            bond_mask,
+            token_type_ids,
             pos_embed_ids,
-        ) = generate_tokens_atom_bond_mask_pos_embed_ids(edge_list)
+        ) = get_token_ids_token_type_ids_pos_embed_ids(mol)
 
-        assert set(chain.from_iterable(edge_list.tolist())) == set(
-            token_ids[atom_mask].tolist()
-        )
+        atom_mask = token_type_ids == TokenType.ATOM
+        bond_mask = token_type_ids == TokenType.BOND
 
         # convert the tokens idxs to match token_mapping dictionary
         input_ids = np.zeros_like(token_ids, dtype=np.uint)
         input_ids[atom_mask] = np.array(
-            [self.encoder[atoms[x]] for x in token_ids[atom_mask]]
+            [self.encoder[atom_types[x]] for x in token_ids[atom_mask]]
         )
         input_ids[bond_mask] = np.array(
-            [self.encoder[bonds[x]] for x in token_ids[bond_mask]]
+            [self.encoder[bond_types[x]] for x in token_ids[bond_mask]]
         )
-
-        # padding lp_embeds to match shape of input_ids
-        # This is needed for _pad later on
-        npad = input_ids.shape[0] - lp_embeds.shape[0]
-        lp_embeds = np.pad(lp_embeds, ((0, npad), (0, 0)), constant_values=0.0)
-
-        def adjust_properties(props, token_ids, mask):
-            adjusted_props = dict()
-            for k, v in props.items():
-                adjusted_v = np.zeros(shape=token_ids.shape, dtype=v.dtype)
-                adjusted_v[mask] = np.array([v[x] for x in token_ids[mask]])
-                adjusted_props[k] = adjusted_v
-
-            return adjusted_props
-
-        atom_props = adjust_properties(atom_props, token_ids, atom_mask)
-        bond_props = adjust_properties(bond_props, token_ids, bond_mask)
 
         atom_props = pack_atom_properties(**atom_props)
         bond_props = pack_bond_properties(**bond_props)
-
-        token_type_ids = np.zeros_like(input_ids, dtype=np.uint)
-        token_type_ids[atom_mask] = TokenType.ATOM.value
-        token_type_ids[bond_mask] = TokenType.BOND.value
 
         # append mol_prop tokens
         if self.config.use_mol_descriptor_tokens:
@@ -331,46 +303,29 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             mol_feature_input_ids = [self.encoder[x] for x in self.config.feature_names]
             input_ids = np.concatenate([input_ids, mol_feature_input_ids], axis=-1)
 
-            mol_feat_pad_len = input_ids.shape[0] - mol_features.shape[0]
-            mol_features = np.pad(
-                mol_features, (mol_feat_pad_len, 0), constant_values=0.0
-            )
-
             token_type_ids = np.pad(
                 token_type_ids, (0, n_mol_feats), constant_values=TokenType.FEAT.value
             )
 
             token_ids = np.pad(token_ids, (0, n_mol_feats), constant_values=0)
-            pos_embed_ids = np.pad(
-                pos_embed_ids, ((0, n_mol_feats), (0, 0)), constant_values=0
-            )  # type: ignore
-            lp_embeds = np.pad(lp_embeds, ((0, n_mol_feats), (0, 0)), constant_values=0)
-            atom_props = np.pad(
-                atom_props, ((0, 0), (0, n_mol_feats)), constant_values=0
-            )  # type: ignore
-            bond_props = np.pad(
-                bond_props, ((0, 0), (0, n_mol_feats)), constant_values=0
-            )  # type: ignore
+            # pos_embed_ids = np.pad(
+            #     pos_embed_ids, ((0, n_mol_feats), (0, 0)), constant_values=-1
+            # )  # type: ignore
 
         # Add target value tokens
         if self.config.use_target_token:
+            target_values = kwargs[self.config.target_col_name]
             input_ids = np.pad(
                 input_ids, (0, 1), constant_values=self.encoder[self.target_token]
             )
 
             target_values = np.zeros_like(input_ids, dtype=float)
-            target_values[-1] = kwargs[self.config.target_col_name]
-
             token_type_ids = np.pad(
                 token_type_ids, (0, 1), constant_values=TokenType.TGT.value
             )
 
             token_ids = np.pad(token_ids, (0, 1), constant_values=0)
-            pos_embed_ids = np.pad(pos_embed_ids, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
-            lp_embeds = np.pad(lp_embeds, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
-            atom_props = np.pad(atom_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
-            bond_props = np.pad(bond_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
-            mol_features = np.pad(mol_features, (0, 1), constant_values=0)  # type: ignore
+            # pos_embed_ids = np.pad(pos_embed_ids, ((0, 1), (0, 0)), constant_values=-1)  # type: ignore
         else:
             target_values = kwargs[self.config.target_col_name]
 
@@ -381,20 +336,17 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         encoded_inputs = {
             "token_ids": token_ids.astype(int).tolist(),
             "input_ids": input_ids.astype(int).tolist(),
-            "pos_embed_ids": pos_embed_ids.flatten().tolist(),
-            "lp_embeds": lp_embeds.flatten().tolist(),
+            "pos_embed_ids": pos_embed_ids.tolist(),
+            "lp_embeds": lp_embeds.tolist(),
             "token_type_ids": token_type_ids.astype(int).tolist(),
             "atom_props": atom_props.tolist(),
             "bond_props": bond_props.tolist(),
-            "target_values": target_values,
         }
 
         if self.config.use_mol_descriptor_tokens:
             encoded_inputs["mol_features"] = mol_features.tolist()
 
         if self.config.use_target_token:
-            encoded_inputs["target_values"] = target_values.tolist()
-        else:
             encoded_inputs["target_values"] = target_values
 
         if truncation_strategy != TruncationStrategy.DO_NOT_TRUNCATE:
@@ -411,35 +363,18 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             encoded_inputs["token_type_ids"].insert(0, TokenType.SPECIAL)
             encoded_inputs["token_type_ids"].append(TokenType.SPECIAL)
 
-            for entry in encoded_inputs["atom_props"]:
-                entry.insert(0, 0)
-                entry.append(0)
+            # encoded_inputs["pos_embed_ids"] = (
+            #     [-1.0] * 2 + encoded_inputs["pos_embed_ids"] + [-1.0] * 2
+            # )
 
-            for entry in encoded_inputs["bond_props"]:
-                entry.insert(0, 0)
-                entry.append(0)
-
-            if self.config.use_mol_descriptor_tokens:
-                encoded_inputs["mol_features"].insert(0, 0.0)
-                encoded_inputs["mol_features"].append(0.0)
-
-            if self.config.use_target_token:
-                encoded_inputs["target_values"].insert(0, 0.0)
-                encoded_inputs["target_values"].append(0.0)
-            
-
-            encoded_inputs["pos_embed_ids"] = (
-                [0.0] * 2 + encoded_inputs["pos_embed_ids"] + [0.0] * 2
-            )
-
-            # We are not padding from the left. If we did, there would be a mismatch
-            # between indexes of lp_embeds and indexes inside pos_embed_ids; the token
-            # with index 0 would have the lp_embeds assigned as 0.0
-            encoded_inputs["lp_embeds"] = (
-                encoded_inputs["lp_embeds"]
-                + [0.0] * self.config.laplace_embeds_size
-                + [0.0] * self.config.laplace_embeds_size
-            )
+            # # We are not padding from the left. If we did, there would be a mismatch
+            # # between indexes of lp_embeds and indexes inside pos_embed_ids; the token
+            # # with index 0 would have the lp_embeds assigned as 0.0
+            # encoded_inputs["lp_embeds"] = (
+            #     encoded_inputs["lp_embeds"]
+            #     + [0.0] * self.config.laplace_embeds_size
+            #     + [0.0] * self.config.laplace_embeds_size
+            # )
 
         # Padding
         if padding_strategy != PaddingStrategy.DO_NOT_PAD or return_attention_mask:
@@ -530,10 +465,131 @@ class MolTTokenizer(PreTrainedTokenizerBase):
 
         return [self.encoder[t] for t in tokens]
 
+    def pad(
+        self,
+        encoded_inputs: Union[
+            BatchEncoding,
+            List[BatchEncoding],
+            Dict[str, EncodedInput],
+            Dict[str, List[EncodedInput]],
+            List[Dict[str, EncodedInput]],
+        ],
+        padding: Union[bool, str, PaddingStrategy] = True,
+        max_length: Optional[int] = None,
+        pad_to_multiple_of: Optional[int] = None,
+        return_attention_mask: Optional[bool] = None,
+        return_tensors: Optional[Union[str, TensorType]] = None,
+        verbose: bool = True,
+    ) -> BatchEncoding:
+        # If we have a list of dicts, let's convert it in a dict of lists
+        # We do this to allow using this method as a collate_fn function in PyTorch Dataloader
+        if isinstance(encoded_inputs, (list, tuple)) and isinstance(
+            encoded_inputs[0], Mapping
+        ):
+            encoded_inputs = {
+                key: [example[key] for example in encoded_inputs]
+                for key in encoded_inputs[0].keys()
+            }
+
+        # The model's main input name, usually `input_ids`, has be passed for padding
+        if self.model_input_names[0] not in encoded_inputs:
+            raise ValueError(
+                "You should supply an encoding or a list of encodings to this method "
+                f"that includes {self.model_input_names[0]}, but you provided {list(encoded_inputs.keys())}"
+            )
+
+        required_input = encoded_inputs[self.model_input_names[0]]
+
+        if required_input is None or (
+            isinstance(required_input, Sized) and len(required_input) == 0
+        ):
+            if return_attention_mask:
+                encoded_inputs["attention_mask"] = []
+            return encoded_inputs
+
+        # If we have PyTorch/TF/NumPy tensors/arrays as inputs, we cast them as python objects
+        # and rebuild them afterwards if no return_tensors is specified
+        # Note that we lose the specific device the tensor may be on for PyTorch
+
+        first_element = required_input[0]
+        if isinstance(first_element, (list, tuple)):
+            # first_element might be an empty list/tuple in some edge cases so we grab the first non empty element.
+            for item in required_input:
+                if len(item) != 0:
+                    first_element = item[0]
+                    break
+        # At this state, if `first_element` is still a list/tuple, it's an empty one so there is nothing to do.
+        if not isinstance(first_element, (int, list, tuple)):
+            if is_tf_tensor(first_element):
+                return_tensors = "tf" if return_tensors is None else return_tensors
+            elif is_torch_tensor(first_element):
+                return_tensors = "pt" if return_tensors is None else return_tensors
+            elif isinstance(first_element, np.ndarray):
+                return_tensors = "np" if return_tensors is None else return_tensors
+            else:
+                raise ValueError(
+                    f"type of {first_element} unknown: {type(first_element)}. "
+                    "Should be one of a python, numpy, pytorch or tensorflow object."
+                )
+
+            for key, value in encoded_inputs.items():
+                encoded_inputs[key] = to_py_obj(value)
+
+        # Convert padding_strategy in PaddingStrategy
+        padding_strategy, _, max_length, _ = self._get_padding_truncation_strategies(
+            padding=padding, max_length=max_length, verbose=verbose
+        )
+
+        if isinstance(required_input[0], (list, tuple)):
+            max_length_map = {k: max(map(len, v)) for k, v in encoded_inputs.items()}
+        else:
+            max_length_map = None
+
+        required_input = encoded_inputs[self.model_input_names[0]]
+        if required_input and not isinstance(required_input[0], (list, tuple)):
+            encoded_inputs = self._pad(
+                encoded_inputs,
+                max_length=max_length,
+                max_length_map=max_length_map,
+                padding_strategy=padding_strategy,
+                pad_to_multiple_of=pad_to_multiple_of,
+                return_attention_mask=return_attention_mask,
+            )
+            return BatchEncoding(encoded_inputs, tensor_type=return_tensors)
+
+        batch_size = len(required_input)
+        assert all(
+            len(v) == batch_size for v in encoded_inputs.values()
+        ), "Some items in the output dictionary have a different batch size than others."
+
+        if padding_strategy == PaddingStrategy.LONGEST:
+            max_length = max(len(inputs) for inputs in required_input)
+            padding_strategy = PaddingStrategy.MAX_LENGTH
+
+        batch_outputs = {}
+        for i in range(batch_size):
+            inputs = {k: v[i] for k, v in encoded_inputs.items()}
+            outputs = self._pad(
+                inputs,
+                max_length=max_length,
+                max_length_map=max_length_map,
+                padding_strategy=padding_strategy,
+                pad_to_multiple_of=pad_to_multiple_of,
+                return_attention_mask=return_attention_mask,
+            )
+
+            for key, value in outputs.items():
+                if key not in batch_outputs:
+                    batch_outputs[key] = []
+                batch_outputs[key].append(value)
+
+        return BatchEncoding(batch_outputs, tensor_type=return_tensors)
+
     def _pad(
         self,
         encoded_inputs: Dict[str, EncodedInput] | BatchEncoding,
         max_length: int | None = None,
+        max_length_map: Dict[str, int] | None = None,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: int | None = None,
         return_attention_mask: bool | None = None,
@@ -569,26 +625,37 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         if needs_to_be_padded and max_length is not None:
             difference = max_length - input_length
 
+            def pad_pos_embed_ids(entry, max_length_map):
+                difference = max_length_map['pos_embed_ids'] - len(entry)
+                return entry + [[0.0, 0.0]] * difference
+            
+            def pad_lp_embeds(entry, max_length_map):
+                difference = max_length_map['lp_embeds'] - len(entry)
+                pad_item = [0.0] * self.laplace_embedding_dim
+                return entry + [pad_item] * difference
+            
+            def pad_atom_props(entry, max_length_map):
+                difference = max_length_map['atom_props'] - len(entry)
+                return entry + [[0.0, 0.0, 0.0, 0.0]] * difference
+            
+            def pad_bond_props(entry, max_length_map):
+                difference = max_length_map['bond_props'] - len(entry)
+                return entry + [[0.0, 0.0, 0.0]] * difference
+
+
             padding_funcs = {
                 "input_ids": lambda x: x + [self.pad_token_id] * difference,
                 "attention_mask": lambda x: x + [0] * difference,
                 "token_ids": lambda x: x + [0] * difference,
                 "token_type_ids": lambda x: x + [TokenType.SPECIAL] * difference,
-                "pos_embed_ids": lambda x: x + [0.0] * (2 * difference),
-                "lp_embeds": lambda x: x
-                + [0.0] * (self.laplace_embedding_dim * difference),
-                "atom_props": lambda x: [entry + [0] * difference for entry in x],
-                "bond_props": lambda x: [entry + [0] * difference for entry in x],
-                "mol_features": lambda x: x + [0] * difference,
-                "target_values": lambda x: x + [0] * difference,
+                "pos_embed_ids": lambda x: pad_pos_embed_ids(x, max_length_map),
+                "lp_embeds": lambda x: pad_lp_embeds(x, max_length_map),
+                "atom_props": lambda x: pad_atom_props(x, max_length_map),
+                "bond_props": lambda x: pad_bond_props(x, max_length_map)
             }
 
-            if self.config.use_target_token:
-                padding_funcs["target_values"] = lambda x: x + [0] * difference
-            else:
-                padding_funcs["target_values"] = lambda x: x
-
             for k in encoded_inputs.keys():
-                encoded_inputs[k] = padding_funcs[k](encoded_inputs[k])
+                if k in padding_funcs:
+                    encoded_inputs[k] = padding_funcs[k](encoded_inputs[k])
 
         return encoded_inputs

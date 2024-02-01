@@ -34,11 +34,12 @@ def unpack_atom_properties(atom_properties):
         }
     else:
         assert len(atom_properties.shape) == 3
+        atom_properties = atom_properties.permute(2, 0, 1)
         return {
-            "prop_atom_in_ring": atom_properties[:, 0],
-            "prop_atom_charge": atom_properties[:, 1],
-            "prop_atom_hybridization": atom_properties[:, 2],
-            "prop_atom_chirality": atom_properties[:, 3],
+            "prop_atom_in_ring": atom_properties[0],
+            "prop_atom_charge": atom_properties[1],
+            "prop_atom_hybridization": atom_properties[2],
+            "prop_atom_chirality": atom_properties[3],
         }
 
 
@@ -57,8 +58,9 @@ def unpack_bond_properties(bond_properties):
         }
     else:
         assert len(bond_properties.shape) == 3
+        bond_properties = bond_properties.permute(2, 0, 1)
         return {
-            "prop_bond_aromatic": bond_properties[:, 0],
-            "prop_bond_conjugated": bond_properties[:, 1],
-            "prop_bond_stereo": bond_properties[:, 2],
+            "prop_bond_aromatic": bond_properties[0],
+            "prop_bond_conjugated": bond_properties[1],
+            "prop_bond_stereo": bond_properties[2],
         }

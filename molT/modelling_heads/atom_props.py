@@ -23,10 +23,12 @@ class AtomPropModellingHead(nn.Module):
     @staticmethod
     @torch.no_grad()
     def adjust_for_input(atom_props, mm_mask, token_type_ids):
-        atom_mask = token_type_ids == TokenType.ATOM
+        atom_mask = token_type_ids == TokenType.ATOM        
         final_mask = atom_mask & mm_mask
-        # For now, just setting all masked tokens to padding idx
-        return atom_props.masked_fill(final_mask.unsqueeze(1), 0.0)
+        # final mask has elements that needs to be masked
+        # we can invert this mask and multiply it with atom_props
+        # to simulate masked_fill with 0.0 on atom_props
+        return atom_props * ~(final_mask.unsqueeze(-1))
 
     @staticmethod
     @torch.no_grad()
@@ -34,7 +36,7 @@ class AtomPropModellingHead(nn.Module):
         atom_mask = token_type_ids == TokenType.ATOM
         final_mask = atom_mask & mm_mask
         # any prop=-100 will be ignored by cross entropy loss
-        return atom_props.masked_fill(~final_mask.unsqueeze(1), -100)
+        return atom_props.to_dense().masked_fill(~final_mask.unsqueeze(-1), -100)
 
     def forward(self, features, atom_props, mm_mask, token_type_ids):
         atom_in_ring = self.in_ring_head(features)

@@ -147,6 +147,36 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
             masked_atom_bond_tokens | masked_mol_feature_tokens | masked_target_tokens
         )
         return batch
+    
+    def scatter_sparse(self, mask, values):
+        B = mask.shape[0]
+        L = mask.shape[1]
+        D = values.shape[-1]
+        # Do below only if ndims of mask != values
+        # TODO: Handle for non batched entries
+        mask = mask.unsqueeze(-1).expand(-1, -1, D)
+        I = torch.argwhere(mask).T
+        V = values[~torch.isnan(values)].flatten()
+        sparse_rep = torch.sparse_coo_tensor(
+            I, V, size=(B, L, D)
+        ).coalesce()
+        return sparse_rep
+
+    
+    def convert_to_sparse(self, batch):
+        token_type_ids = batch['token_type_ids']
+
+        atom_props = batch['atom_props']
+        atom_mask = token_type_ids == TokenType.ATOM
+        batch['atom_props'] =  self.scatter_sparse(atom_mask, atom_props)
+        
+        bond_props = batch['bond_props']
+        bond_mask = token_type_ids == TokenType.BOND
+        batch['bond_props'] =  self.scatter_sparse(bond_mask, bond_props)
+
+        batch['pos_embed_ids'] = self.scatter_sparse(atom_mask | bond_mask, batch['pos_embed_ids'])
+
+        return batch
 
     def torch_call(
         self, examples: List[Union[List[int], Any, Dict[str, Any]]]
@@ -159,4 +189,5 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         )
 
         batch = self.torch_mask_tokens(batch)
+        batch = self.convert_to_sparse(batch)
         return batch

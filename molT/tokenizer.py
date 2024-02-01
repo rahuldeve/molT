@@ -278,6 +278,12 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             pos_embed_ids,
         ) = get_token_ids_token_type_ids_pos_embed_ids(mol)
 
+        # Need to add a padding idx for lp_embeds
+        # For now idx=0 is set as padding_idx. All values
+        # in pos_embed_idxs are changed to reflect this
+        lp_embeds = np.pad(lp_embeds, ((1, 0), (0, 0)), constant_values=0.0)
+        pos_embed_ids += 1
+
         atom_mask = token_type_ids == TokenType.ATOM
         bond_mask = token_type_ids == TokenType.BOND
 
@@ -545,6 +551,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         else:
             max_length_map = None
 
+
         required_input = encoded_inputs[self.model_input_names[0]]
         if required_input and not isinstance(required_input[0], (list, tuple)):
             encoded_inputs = self._pad(
@@ -627,20 +634,26 @@ class MolTTokenizer(PreTrainedTokenizerBase):
 
             def pad_pos_embed_ids(entry, max_length_map):
                 difference = max_length_map['pos_embed_ids'] - len(entry)
-                return entry + [[0.0, 0.0]] * difference
+                pad_item = [float('nan')] * 2
+                return entry + [pad_item] * difference
             
             def pad_lp_embeds(entry, max_length_map):
                 difference = max_length_map['lp_embeds'] - len(entry)
-                pad_item = [0.0] * self.laplace_embedding_dim
-                return entry + [pad_item] * difference
+                pad_item = [float('nan')] * self.laplace_embedding_dim
+                ret_val = entry + [pad_item] * difference
+                if len(ret_val) == 27 and max_length_map['lp_embeds'] == 28:
+                    raise ValueError()
+                return ret_val
             
             def pad_atom_props(entry, max_length_map):
                 difference = max_length_map['atom_props'] - len(entry)
-                return entry + [[0.0, 0.0, 0.0, 0.0]] * difference
+                pad_item = [float('nan')] * 4
+                return entry + [pad_item] * difference
             
             def pad_bond_props(entry, max_length_map):
                 difference = max_length_map['bond_props'] - len(entry)
-                return entry + [[0.0, 0.0, 0.0]] * difference
+                pad_item = [float('nan')] * 3
+                return entry + [pad_item] * difference
 
 
             padding_funcs = {

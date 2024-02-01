@@ -21,10 +21,12 @@ class BondPropModellingHead(nn.Module):
     @staticmethod
     @torch.no_grad()
     def adjust_for_input(bond_props, mm_mask, token_type_ids):
-        bond_mask = token_type_ids == TokenType.BOND
-        final_mask = bond_mask & mm_mask
-        # For now, just setting all masked tokens to padding idx
-        return bond_props.masked_fill(final_mask.unsqueeze(1), 0.0)
+        atom_mask = token_type_ids == TokenType.BOND        
+        final_mask = atom_mask & mm_mask
+        # final mask has elements that needs to be masked
+        # we can invert this mask and multiply it with atom_props
+        # to simulate masked_fill with 0.0 on atom_props
+        return bond_props * ~(final_mask.unsqueeze(-1))
 
     @staticmethod
     @torch.no_grad()
@@ -33,7 +35,7 @@ class BondPropModellingHead(nn.Module):
         final_mask = bond_mask & mm_mask
         # any prop=-100 will be ignored by cross entropy loss
         # set props of any tokens not selected in final_mask to -100
-        return bond_props.masked_fill(~final_mask.unsqueeze(1), -100)
+        return bond_props.to_dense().masked_fill(~final_mask.unsqueeze(-1), -100)
 
     def forward(self, features, bond_props, mm_mask, token_type_ids):
         bond_is_aromatic = self.aromatic_head(features)

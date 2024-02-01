@@ -7,9 +7,9 @@ from .utils import TokenType, unpack_atom_properties, unpack_bond_properties
 
 
 class AtomPropertyEmbedder(nn.Module):
-    def __init__(self, config) -> None:
+    def __init__(self, config: MolTConfig) -> None:
         super().__init__()
-
+        self.config = config
         self.in_ring_embedding = nn.Embedding(
             3, config.embedding_size, padding_idx=0
         )
@@ -25,6 +25,14 @@ class AtomPropertyEmbedder(nn.Module):
             len(ChiralType.values) + 1, config.embedding_size, padding_idx=0
         )
 
+    def sparse_embedding_select(self, sparse_prop, prop_embedding):
+        sparse_prop = sparse_prop.coalesce().long()
+        B, L = sparse_prop.shape
+        D = self.config.embedding_size
+        I, V = sparse_prop.indices(), sparse_prop.values()
+        sparse_embeds = torch.sparse_coo_tensor(I, prop_embedding(V), size=(B, L, D))
+        return sparse_embeds
+
     def forward(
         self,
         prop_atom_in_ring,
@@ -32,12 +40,12 @@ class AtomPropertyEmbedder(nn.Module):
         prop_atom_hybridization,
         prop_atom_chirality,
     ):
-        in_ring_embeds = self.in_ring_embedding(prop_atom_in_ring.long())
-        charge_embedding = self.charge_embedding(prop_atom_charge.long())
-        hybridization_embedding = self.hybridization_embedding(
-            prop_atom_hybridization.long()
+        in_ring_embeds = self.sparse_embedding_select(prop_atom_in_ring, self.in_ring_embedding)
+        charge_embedding = self.sparse_embedding_select(prop_atom_charge, self.charge_embedding)
+        hybridization_embedding = self.sparse_embedding_select(
+            prop_atom_hybridization, self.hybridization_embedding
         )
-        chirality_embedding = self.chirality_embedding(prop_atom_chirality.long())
+        chirality_embedding = self.sparse_embedding_select(prop_atom_chirality, self.chirality_embedding)
 
         prop_embedding = (
             in_ring_embeds
@@ -50,9 +58,9 @@ class AtomPropertyEmbedder(nn.Module):
 
 
 class BondPropertyEmbedder(nn.Module):
-    def __init__(self, config) -> None:
+    def __init__(self, config: MolTConfig) -> None:
         super().__init__()
-
+        self.config = config
         self.aromatic_embedding = nn.Embedding(
             3, config.embedding_size, padding_idx=0
         )
@@ -65,15 +73,23 @@ class BondPropertyEmbedder(nn.Module):
             len(StereoType.values) + 1, config.embedding_size, padding_idx=0
         )
 
+    def sparse_embedding_select(self, sparse_prop, prop_embedding):
+        sparse_prop = sparse_prop.coalesce().long()
+        B, L = sparse_prop.shape
+        D = self.config.embedding_size
+        I, V = sparse_prop.indices(), sparse_prop.values()
+        sparse_embeds = torch.sparse_coo_tensor(I, prop_embedding(V), size=(B, L, D))
+        return sparse_embeds
+
     def forward(
         self,
         prop_bond_aromatic,
         prop_bond_conjugated,
         prop_bond_stereo,
     ):
-        aromatic_embeds = self.aromatic_embedding(prop_bond_aromatic.long())
-        conjugated_embeds = self.conjugated_embedding(prop_bond_conjugated.long())
-        stereo_embeds = self.stereo_embedding(prop_bond_stereo.long())
+        aromatic_embeds = self.sparse_embedding_select(prop_bond_aromatic, self.aromatic_embedding)
+        conjugated_embeds = self.sparse_embedding_select(prop_bond_conjugated, self.conjugated_embedding)
+        stereo_embeds = self.sparse_embedding_select(prop_bond_stereo, self.stereo_embedding)
 
         prop_embedding = aromatic_embeds + conjugated_embeds + stereo_embeds
         return prop_embedding
@@ -122,11 +138,14 @@ class PositionEmbedder(nn.Module):
 
     @torch.no_grad()
     def forward(self, pos_embed_ids, lp_embeds, token_type_ids):
-        B, L = token_type_ids.shape
-        pos_embed_ids = pos_embed_ids.reshape((B, L, -1)).long()
-        lp_embeds = lp_embeds.reshape((B, L, -1))
+        lp_embeds = torch.nan_to_num(lp_embeds, 0.0)
+        # Not sure how to construct a sparse pos_embedding tensor
+        # using the values from pos_embed_idxs to index from lp_embeds
+        # makes CUDA crash, possibly due to OOM
+        pos_embed_ids = pos_embed_ids.to_dense().long()
 
         if self.training:
+            B, L, _ = lp_embeds.shape
             random_signs = -1 + 2 * torch.randint(
                 0, 2, (B, L), device=lp_embeds.device
             ).unsqueeze(-1)
@@ -135,11 +154,6 @@ class PositionEmbedder(nn.Module):
         pos_embeds = self.vectorized_batch_select(pos_embed_ids, lp_embeds)
         pos_embeds = pos_embeds.flatten(-2, -1)
 
-        atom_mask = token_type_ids == TokenType.ATOM
-        bond_mask = token_type_ids == TokenType.BOND
-        atom_bond_mask = atom_mask | bond_mask
-        pos_embeds = torch.where(atom_bond_mask.unsqueeze(-1), pos_embeds, 0.0)
-        # n_repeat = self.config.embedding_size // (2*self.config.laplace_embeds_size)
         return pos_embeds
 
 

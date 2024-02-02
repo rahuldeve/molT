@@ -370,7 +370,8 @@ class MolTTokenizer(PreTrainedTokenizerBase):
             lp_embeds = np.pad(lp_embeds, ((0, 1), (0, 0)), constant_values=0)  # type: ignore
             atom_props = np.pad(atom_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
             bond_props = np.pad(bond_props, ((0, 0), (0, 1)), constant_values=0)  # type: ignore
-            mol_features = np.pad(mol_features, (0, 1), constant_values=0)  # type: ignore
+            if self.config.use_mol_descriptor_tokens:
+                mol_features = np.pad(mol_features, (0, 1), constant_values=0)  # type: ignore
         else:
             target_values = kwargs[self.config.target_col_name]
 

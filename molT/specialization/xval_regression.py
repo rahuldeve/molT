@@ -110,8 +110,12 @@ class XValRegression(MolTPreTrainedModel):
             bond_props=BondPropModellingHead.adjust_for_input(
                 bond_props, mm_mask, token_type_ids
             ),
-            mol_features=MolFeatureModellingHead.adjust_for_input(
-                mol_features, mm_mask, token_type_ids
+            mol_features=(
+                MolFeatureModellingHead.adjust_for_input(
+                    mol_features, mm_mask, token_type_ids
+                )
+                if mol_features is not None
+                else None
             ),
             target_values=XValTargetRegressionHead.adjust_for_input(
                 target_values, mm_mask, token_type_ids, self.training
@@ -131,28 +135,26 @@ class XValRegression(MolTPreTrainedModel):
             sequence_output, bond_props, mm_mask, token_type_ids
         )
 
-        mol_feature_loss, _ = self.mol_feat_head(
-            sequence_output, mol_features, mm_mask, token_type_ids
-        )
+        if mol_features is not None:
+            mol_feature_loss, _ = self.mol_feat_head(
+                sequence_output, mol_features, mm_mask, token_type_ids
+            )
+        else:
+            mol_feature_loss = 0.0
 
         target_loss, pred_target_values, target_values = self.target_head(
             sequence_output, target_values, mm_mask, token_type_ids
         )
 
-        loss = None
-        if (
-            molecule_modelling_loss is not None
-            and atom_prop_loss is not None
-            and bond_prop_loss is not None
-            and mol_feature_loss is not None
-        ):
-            loss = (
-                molecule_modelling_loss
-                + atom_prop_loss
-                + bond_prop_loss
-                + mol_feature_loss
-                + target_loss
-            )
+        loss = target_loss
+        if molecule_modelling_loss is not None:
+            loss += molecule_modelling_loss
+
+        if atom_prop_loss is not None and bond_prop_loss is not None:
+            loss += atom_prop_loss + bond_prop_loss
+
+        if mol_features is not None:
+            loss += mol_feature_loss
 
         return XValRegressionOutput(
             loss=loss,

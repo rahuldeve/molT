@@ -140,7 +140,7 @@ class XValRegression(MolTPreTrainedModel):
                 sequence_output, mol_features, mm_mask, token_type_ids
             )
         else:
-            mol_feature_loss = 0.0
+            mol_feature_loss = torch.tensor([0.0])
 
         target_loss, pred_target_values, target_values = self.target_head(
             sequence_output, target_values, mm_mask, token_type_ids

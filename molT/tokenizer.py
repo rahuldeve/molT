@@ -143,6 +143,7 @@ class MolTTokenizer(PreTrainedTokenizerBase):
         "atom_props",
         "bond_props",
         "target_values",
+        "pure"
     ]
 
     def __init__(

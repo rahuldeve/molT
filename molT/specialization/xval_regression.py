@@ -77,6 +77,7 @@ class XValRegression(MolTPreTrainedModel):
         # the following args are not needed but huggingface tokenizer
         # will not send them to the collator if its not specified here
         token_ids: Optional[torch.Tensor] = None,
+        pure: Optional[torch.Tensor] = None,
     ) -> Union[Tuple[torch.Tensor], XValRegressionOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -91,7 +92,7 @@ class XValRegression(MolTPreTrainedModel):
         )
 
         outputs = self.graph_transformer(
-            input_ids=input_ids,
+            input_ids=input_ids if self.training else pure,
             attention_mask=attention_mask,
             pos_embed_ids=pos_embed_ids,
             lp_embeds=lp_embeds,

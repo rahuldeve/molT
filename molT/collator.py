@@ -81,6 +81,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
         input_ids = batch["input_ids"]
         token_type_ids = batch["token_type_ids"]
         labels = input_ids.clone()
+        pure = input_ids.clone()
 
         # mask atom and bonds
         atom_mask = token_type_ids == TokenType.ATOM
@@ -143,6 +144,7 @@ class DataCollatorForMaskedMolecularModeling(DataCollatorMixin):
 
         batch["input_ids"] = input_ids
         batch["labels"] = labels
+        batch['pure'] = pure
         batch["mm_mask"] = (
             masked_atom_bond_tokens | masked_mol_feature_tokens | masked_target_tokens
         )
